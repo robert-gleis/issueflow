@@ -9,6 +9,82 @@ function createPromptCancelError(): Error {
 }
 
 describe('createStartPlan', () => {
+  it('passes sorted status-enriched issues into the chooser', async () => {
+    const result = await createStartPlan(
+      {
+        cwd: '/repo',
+        tool: 'codex',
+        printOnly: true
+      },
+      {
+        resolveRepoRoot: async () => '/repo',
+        readOriginRemote: async () => 'git@github.com:robert-gleis/issueflow.git',
+        listAssignedIssues: async () => [
+          {
+            number: 12,
+            title: 'Active issue',
+            body: '',
+            url: 'https://github.com/robert-gleis/issueflow/issues/12',
+            labels: [],
+            assignees: ['robert-gleis'],
+            slug: 'active-issue',
+            status: 'In Progress'
+          },
+          {
+            number: 13,
+            title: 'Next issue',
+            body: '',
+            url: 'https://github.com/robert-gleis/issueflow/issues/13',
+            labels: [],
+            assignees: ['robert-gleis'],
+            slug: 'next-issue',
+            status: 'Todo'
+          },
+          {
+            number: 14,
+            title: 'Finished issue',
+            body: '',
+            url: 'https://github.com/robert-gleis/issueflow/issues/14',
+            labels: [],
+            assignees: ['robert-gleis'],
+            slug: 'finished-issue',
+            status: 'Done'
+          },
+          {
+            number: 15,
+            title: 'Untracked issue',
+            body: '',
+            url: 'https://github.com/robert-gleis/issueflow/issues/15',
+            labels: [],
+            assignees: ['robert-gleis'],
+            slug: 'untracked-issue',
+            status: null
+          }
+        ],
+        listLocalBranches: async () => [],
+        listWorktreeEntries: async () => [],
+        createIssueWorktree: async () => undefined,
+        attachExistingBranchToWorktree: async () => undefined,
+        findIssueArtifacts: async (repoRoot) => ({
+          spec: `${repoRoot}/docs/issueflow/specs/2026-04-24-issue-12-design.md`,
+          plan: null,
+          planReview: null,
+          implementationReview: null
+        }),
+        writeSessionState: async () => undefined,
+        writeIssuePacket: async () => undefined,
+        chooseIssue: async (issues) => {
+          expect(issues.map((issue) => issue.status)).toEqual(['In Progress', 'Todo', 'Done', null]);
+          return issues[0];
+        },
+        confirmReuse: async () => true,
+        now: () => new Date('2026-04-24T10:00:00.000Z')
+      }
+    );
+
+    expect(result.mode).toBe('print-only');
+  });
+
   it('returns print-only output without launching a process', async () => {
     const result = await createStartPlan(
       {
@@ -27,7 +103,8 @@ describe('createStartPlan', () => {
             url: 'https://github.com/robert-gleis/issueflow/issues/12',
             labels: ['workflow'],
             assignees: ['robert-gleis'],
-            slug: 'ship-issueflow-start'
+            slug: 'ship-issueflow-start',
+            status: null
           }
         ],
         listLocalBranches: async () => [],
@@ -85,7 +162,8 @@ describe('createStartPlan', () => {
             url: 'https://github.com/robert-gleis/issueflow/issues/12',
             labels: ['workflow'],
             assignees: ['robert-gleis'],
-            slug: 'ship-issueflow-start'
+            slug: 'ship-issueflow-start',
+            status: null
           }
         ],
         listLocalBranches: async () => [],
@@ -157,7 +235,8 @@ describe('createStartPlan', () => {
             url: 'https://github.com/robert-gleis/issueflow/issues/12',
             labels: ['workflow'],
             assignees: ['robert-gleis'],
-            slug: 'ship-issueflow-start'
+            slug: 'ship-issueflow-start',
+            status: null
           }
         ],
         listLocalBranches: async () => ['issue/12-ship-issueflow-start'],
@@ -223,7 +302,8 @@ describe('createStartPlan', () => {
             url: 'https://github.com/robert-gleis/issueflow/issues/12',
             labels: ['workflow'],
             assignees: ['robert-gleis'],
-            slug: 'ship-issueflow-start'
+            slug: 'ship-issueflow-start',
+            status: null
           }
         ],
         listLocalBranches: async () => ['issue/12-ship-issueflow-start'],
