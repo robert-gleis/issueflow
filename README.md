@@ -16,6 +16,32 @@ npm test
 npm run build
 ```
 
+## Local CLI install and updates
+
+To make the local checkout available as the `issueflow` command:
+
+```bash
+npm install
+npm run build
+npm link
+```
+
+After pulling or otherwise updating this checkout, rebuild the CLI:
+
+```bash
+npm install # only needed when dependencies changed
+npm run build
+```
+
+You usually do not need to run `npm link` again; the global command points at this checkout. If the link points at an old clone or a moved directory, relink it from the checkout you want to use:
+
+```bash
+npm unlink -g issueflow
+npm link
+which issueflow
+issueflow --help
+```
+
 ## Usage
 
 ```bash
@@ -40,4 +66,4 @@ The reusable host assets are committed under `integrations/`:
 - `integrations/claude/commands/issueflow.md`
 - `integrations/cursor/commands/issueflow.md`
 
-See [docs/host-integrations.md](/Users/A15AB98/.codex/worktrees/34b0/issueflow/.worktrees/issueflow-v1/docs/host-integrations.md) for manual installation instructions.
+See [docs/host-integrations.md](docs/host-integrations.md) for manual installation instructions.
