@@ -21,6 +21,7 @@ import {
   listLocalBranches,
   listWorktreeEntries,
   runWorktreeSetup,
+  WorktreeSetupError,
   WORKTREE_SETUP_SCRIPT
 } from '../core/worktree.js';
 import { buildIssuePacket, buildWorkflowKernel } from '../workflow/kernel.js';
@@ -69,7 +70,10 @@ const defaultDeps: StartPlanDeps = {
   listWorktreeEntries,
   createIssueWorktree,
   attachExistingBranchToWorktree,
-  setupNewWorktree: runWorktreeSetup,
+  setupNewWorktree: (sourceCheckout, worktreePath) =>
+    runWorktreeSetup(sourceCheckout, worktreePath, {
+      spinnerLabel: 'Running worktree setup'
+    }),
   findIssueArtifacts,
   writeSessionState,
   writeIssuePacket,
@@ -371,11 +375,23 @@ export async function createStartPlan(input: { cwd: string; tool: HostTool; prin
 }
 
 export async function startAction(options: StartOptions): Promise<void> {
-  const result = await createStartPlan({
-    cwd: process.cwd(),
-    tool: options.tool,
-    printOnly: Boolean(options.printOnly)
-  });
+  let result: StartPlanResult;
+
+  try {
+    result = await createStartPlan({
+      cwd: process.cwd(),
+      tool: options.tool,
+      printOnly: Boolean(options.printOnly)
+    });
+  } catch (error) {
+    if (error instanceof WorktreeSetupError) {
+      console.error(error.message);
+      process.exitCode = 1;
+      return;
+    }
+
+    throw error;
+  }
 
   if (result.mode === 'empty' || result.mode === 'cancelled') {
     console.log(result.message);

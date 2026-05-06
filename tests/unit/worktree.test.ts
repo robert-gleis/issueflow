@@ -10,7 +10,8 @@ import {
   createIssueWorktree,
   ensureUniqueWorkspaceNames,
   findExistingWorkspaceMatch,
-  runWorktreeSetup
+  runWorktreeSetup,
+  WorktreeSetupError
 } from '../../src/core/worktree.js';
 
 describe('findExistingWorkspaceMatch', () => {
@@ -104,6 +105,89 @@ describe('runWorktreeSetup', () => {
       await expect(runWorktreeSetup('/source/repo', worktreePath)).resolves.toBe(true);
 
       await expect(fs.readFile(outputPath, 'utf8')).resolves.toBe(`${realWorktreePath}\n/source/repo\n`);
+    } finally {
+      await fs.rm(worktreePath, { recursive: true, force: true });
+    }
+  });
+
+  it('does not stream successful setup hook output to the terminal', async () => {
+    const worktreePath = await fs.mkdtemp(path.join(os.tmpdir(), 'issueflow-worktree-'));
+    const scriptsDir = path.join(worktreePath, 'scripts');
+    const originalStdoutWrite = process.stdout.write;
+    const originalStderrWrite = process.stderr.write;
+    let terminalOutput = '';
+
+    try {
+      await fs.mkdir(scriptsDir);
+      await fs.writeFile(
+        path.join(scriptsDir, 'setup-new-worktree.sh'),
+        ['#!/usr/bin/env bash', 'set -euo pipefail', 'echo "noisy stdout"', 'echo "noisy stderr" >&2', ''].join('\n')
+      );
+
+      process.stdout.write = ((chunk: string | Uint8Array) => {
+        terminalOutput += chunk.toString();
+        return true;
+      }) as typeof process.stdout.write;
+      process.stderr.write = ((chunk: string | Uint8Array) => {
+        terminalOutput += chunk.toString();
+        return true;
+      }) as typeof process.stderr.write;
+
+      await expect(runWorktreeSetup('/source/repo', worktreePath)).resolves.toBe(true);
+
+      expect(terminalOutput).toBe('');
+    } finally {
+      process.stdout.write = originalStdoutWrite;
+      process.stderr.write = originalStderrWrite;
+      await fs.rm(worktreePath, { recursive: true, force: true });
+    }
+  });
+
+  it('shows spinner status when a setup hook runs with a TTY stream', async () => {
+    const worktreePath = await fs.mkdtemp(path.join(os.tmpdir(), 'issueflow-worktree-'));
+    const scriptsDir = path.join(worktreePath, 'scripts');
+    const writes: string[] = [];
+    const stream = {
+      isTTY: true,
+      write: (chunk: string | Uint8Array) => {
+        writes.push(chunk.toString());
+        return true;
+      }
+    } as NodeJS.WriteStream;
+
+    try {
+      await fs.mkdir(scriptsDir);
+      await fs.writeFile(path.join(scriptsDir, 'setup-new-worktree.sh'), ['#!/usr/bin/env bash', 'set -euo pipefail', ''].join('\n'));
+
+      await expect(
+        runWorktreeSetup('/source/repo', worktreePath, {
+          spinnerLabel: 'Running worktree setup',
+          stream
+        })
+      ).resolves.toBe(true);
+
+      expect(writes.join('')).toContain('Running worktree setup');
+      expect(writes.join('')).toContain('Done: Running worktree setup');
+    } finally {
+      await fs.rm(worktreePath, { recursive: true, force: true });
+    }
+  });
+
+  it('includes captured setup hook output when the hook fails', async () => {
+    const worktreePath = await fs.mkdtemp(path.join(os.tmpdir(), 'issueflow-worktree-'));
+    const scriptsDir = path.join(worktreePath, 'scripts');
+
+    try {
+      await fs.mkdir(scriptsDir);
+      await fs.writeFile(
+        path.join(scriptsDir, 'setup-new-worktree.sh'),
+        ['#!/usr/bin/env bash', 'set -euo pipefail', 'echo "installing deps"', 'echo "turbo failed" >&2', 'exit 1', ''].join('\n')
+      );
+
+      await expect(runWorktreeSetup('/source/repo', worktreePath)).rejects.toMatchObject({
+        name: 'WorktreeSetupError',
+        message: expect.stringMatching(/Worktree setup failed[\s\S]*installing deps[\s\S]*turbo failed/)
+      } satisfies Partial<WorktreeSetupError>);
     } finally {
       await fs.rm(worktreePath, { recursive: true, force: true });
     }

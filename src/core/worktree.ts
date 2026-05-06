@@ -1,12 +1,71 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import type { WriteStream } from 'node:tty';
 
-import { execa } from 'execa';
+import { execa, type ExecaError } from 'execa';
 
 import type { ExistingWorkspaceMatch, IssueSummary, WorktreeEntry } from './types.js';
 
 export const WORKTREE_SETUP_SCRIPT = path.join('scripts', 'setup-new-worktree.sh');
 export const ISSUE_BRANCH_START_POINT = 'origin/main';
+
+export interface WorktreeSetupOptions {
+  spinnerLabel?: string;
+  stream?: NodeJS.WriteStream;
+}
+
+export class WorktreeSetupError extends Error {
+  constructor(output: string) {
+    super(`Worktree setup failed.\n\n${output}`);
+    this.name = 'WorktreeSetupError';
+  }
+}
+
+function formatCapturedOutput(error: ExecaError): string {
+  const lines = [error.shortMessage ?? error.message];
+  const stdout = typeof error.stdout === 'string' ? error.stdout.trim() : '';
+  const stderr = typeof error.stderr === 'string' ? error.stderr.trim() : '';
+
+  if (stdout) {
+    lines.push('', 'stdout:', stdout);
+  }
+
+  if (stderr) {
+    lines.push('', 'stderr:', stderr);
+  }
+
+  return lines.join('\n');
+}
+
+async function withSpinner<T>(label: string | undefined, stream: NodeJS.WriteStream | undefined, task: () => Promise<T>): Promise<T> {
+  const ttyStream = stream as WriteStream | undefined;
+
+  if (!label || !ttyStream?.isTTY) {
+    return task();
+  }
+
+  const frames = ['-', '\\', '|', '/'];
+  let frameIndex = 0;
+
+  const render = (status: string) => {
+    ttyStream.write(`\r${frames[frameIndex]} ${status}`);
+    frameIndex = (frameIndex + 1) % frames.length;
+  };
+
+  render(label);
+  const interval = setInterval(() => render(label), 80);
+
+  try {
+    const result = await task();
+    clearInterval(interval);
+    ttyStream.write(`\rDone: ${label}\n`);
+    return result;
+  } catch (error) {
+    clearInterval(interval);
+    ttyStream.write(`\rFailed: ${label}\n`);
+    throw error;
+  }
+}
 
 export function buildBranchName(issue: Pick<IssueSummary, 'number' | 'slug'>): string {
   return `issue/${issue.number}-${issue.slug}`;
@@ -72,7 +131,7 @@ export async function attachExistingBranchToWorktree(
   await execa('git', ['worktree', 'add', worktreePath, branchName], { cwd: repoRoot });
 }
 
-export async function runWorktreeSetup(sourceCheckout: string, worktreePath: string): Promise<boolean> {
+export async function runWorktreeSetup(sourceCheckout: string, worktreePath: string, options: WorktreeSetupOptions = {}): Promise<boolean> {
   const scriptPath = path.join(worktreePath, WORKTREE_SETUP_SCRIPT);
 
   try {
@@ -85,12 +144,21 @@ export async function runWorktreeSetup(sourceCheckout: string, worktreePath: str
     throw error;
   }
 
-  await execa('bash', [scriptPath], {
-    cwd: worktreePath,
-    env: {
-      MAIN_REPO_ROOT: sourceCheckout
-    },
-    stdio: 'inherit'
+  await withSpinner(options.spinnerLabel, options.stream ?? process.stderr, async () => {
+    try {
+      await execa('bash', [scriptPath], {
+        cwd: worktreePath,
+        env: {
+          MAIN_REPO_ROOT: sourceCheckout
+        }
+      });
+    } catch (error) {
+      if (error instanceof Error && 'stdout' in error && 'stderr' in error) {
+        throw new WorktreeSetupError(formatCapturedOutput(error as ExecaError));
+      }
+
+      throw error;
+    }
   });
 
   return true;
