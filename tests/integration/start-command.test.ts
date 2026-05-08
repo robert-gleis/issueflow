@@ -206,6 +206,16 @@ describe('createStartPlan', () => {
         plan: 'pending',
         implementation: 'pending'
       },
+      reviewLoops: {
+        plan: {
+          currentRound: 1,
+          maxRounds: 5
+        },
+        implementation: {
+          currentRound: 1,
+          maxRounds: 5
+        }
+      },
       createdAt: '2026-04-24T10:00:00.000Z',
       updatedAt: '2026-04-24T10:00:00.000Z',
       artifacts: {
@@ -215,6 +225,11 @@ describe('createStartPlan', () => {
         implementationReview: null
       }
     });
+    if (result.mode === 'launch') {
+      expect(result.launchPlan.args.join('\n')).toContain('Plan Review/Fix Loop');
+      expect(result.launchPlan.args.join('\n')).toContain('Implementation Review/Fix Loop');
+      expect(result.launchPlan.args.join('\n')).toContain('up to 5 rounds');
+    }
   });
 
   it('runs a project setup hook after creating a new worktree and before discovering artifacts', async () => {
