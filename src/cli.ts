@@ -1,6 +1,7 @@
 import { Command, Option } from 'commander';
 
 import { startAction } from './commands/start.js';
+import { verifyAction } from './commands/verify.js';
 
 export function buildCli(): Command {
   const program = new Command();
@@ -28,6 +29,15 @@ Worktree setup:
   the source checkout. Existing reused worktrees skip this hook.`
     )
     .action(startAction);
+
+  program
+    .command('verify')
+    .description('Run the verification pipeline against the current repo state')
+    .option('--issue <number>', 'Issue id to associate this run with', (value) => Number.parseInt(value, 10))
+    .option('--config <path>', 'Path to the verification config file')
+    .option('--print-only', 'Print the resolved plan without spawning checks')
+    .option('--bail', 'Stop the pipeline after the first failing check')
+    .action(verifyAction);
 
   return program;
 }

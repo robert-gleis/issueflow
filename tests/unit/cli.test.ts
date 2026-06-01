@@ -25,4 +25,16 @@ describe('buildCli', () => {
     expect(helpOutput).toContain('scripts/setup-new-worktree.sh');
     expect(helpOutput).toContain('MAIN_REPO_ROOT');
   });
+
+  it('registers the verify command with the expected options', () => {
+    const program = buildCli();
+    const verify = program.commands.find((command) => command.name() === 'verify');
+
+    expect(verify).toBeDefined();
+    const optionFlags = verify?.options.map((option) => option.long) ?? [];
+    expect(optionFlags).toContain('--issue');
+    expect(optionFlags).toContain('--config');
+    expect(optionFlags).toContain('--print-only');
+    expect(optionFlags).toContain('--bail');
+  });
 });
