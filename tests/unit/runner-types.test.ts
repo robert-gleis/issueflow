@@ -86,3 +86,18 @@ describe('RunnerError', () => {
     }
   });
 });
+
+import * as runnersBarrel from '../../src/runners/index.js';
+import type { Runner as RunnerType } from '../../src/runners/index.js';
+
+describe('src/runners barrel re-export', () => {
+  it('exposes RunnerError and ScriptedRunner as values', () => {
+    expect(typeof runnersBarrel.RunnerError).toBe('function');
+    expect(typeof runnersBarrel.ScriptedRunner).toBe('function');
+  });
+
+  it('exposes Runner as a type that ScriptedRunner satisfies', () => {
+    const runner: RunnerType = new runnersBarrel.ScriptedRunner('r1');
+    expect(runner.id).toBe('r1');
+  });
+});
