@@ -113,4 +113,85 @@ describe('ScriptedRunner', () => {
       expect(status.stoppedAt).toBeUndefined();
     });
   });
+
+  describe('stop() lifecycle', () => {
+    it('transitions running → stopped, sets stoppedAt and exitCode from the script', async () => {
+      const runner = new ScriptedRunner('r1', { exitCode: 7 });
+      await runner.spawn({ binary: '/bin/true', args: [], cwd: '/tmp' });
+
+      await runner.stop();
+      const status = await runner.status();
+
+      expect(status.state).toBe('stopped');
+      expect(status.stoppedAt).toBeInstanceOf(Date);
+      expect(status.exitCode).toBe(7);
+    });
+
+    it('defaults exitCode to 0 when the script omits it', async () => {
+      const runner = new ScriptedRunner('r1');
+      await runner.spawn({ binary: '/bin/true', args: [], cwd: '/tmp' });
+
+      await runner.stop();
+      const status = await runner.status();
+
+      expect(status.exitCode).toBe(0);
+    });
+
+    it('is a no-op when called from idle (never spawned)', async () => {
+      const runner = new ScriptedRunner('r1');
+
+      await expect(runner.stop()).resolves.toBeUndefined();
+      const status = await runner.status();
+      expect(status.state).toBe('idle');
+      expect(status.stoppedAt).toBeUndefined();
+      expect(status.exitCode).toBeUndefined();
+    });
+
+    it('is idempotent when already stopped', async () => {
+      const runner = new ScriptedRunner('r1');
+      await runner.spawn({ binary: '/bin/true', args: [], cwd: '/tmp' });
+      await runner.stop();
+      const firstStoppedAt = (await runner.status()).stoppedAt;
+
+      await expect(runner.stop()).resolves.toBeUndefined();
+      const status = await runner.status();
+
+      expect(status.state).toBe('stopped');
+      expect(status.stoppedAt).toEqual(firstStoppedAt);
+    });
+
+    it('transitions error → stopped after a failed spawn', async () => {
+      const runner = new ScriptedRunner('r1', { failOnSpawn: 'boom', exitCode: 2 });
+      await runner.spawn({ binary: '/bin/true', args: [], cwd: '/tmp' }).catch(() => {});
+      const beforeStop = await runner.status();
+      expect(beforeStop.state).toBe('error');
+
+      await runner.stop();
+      const status = await runner.status();
+
+      expect(status.state).toBe('stopped');
+      expect(status.stoppedAt).toBeInstanceOf(Date);
+      expect(status.exitCode).toBe(2);
+      expect(status.error).toBe('boom');
+    });
+
+    it('transitions starting → stopped while spawn is still in flight', async () => {
+      const runner = new ScriptedRunner('r1', { spawnDelayMs: 50, exitCode: 1 });
+      const spawnPromise = runner.spawn({ binary: '/bin/true', args: [], cwd: '/tmp' });
+
+      const midFlight = await runner.status();
+      expect(midFlight.state).toBe('starting');
+
+      await runner.stop();
+      const status = await runner.status();
+
+      expect(status.state).toBe('stopped');
+      expect(status.exitCode).toBe(1);
+
+      // The in-flight spawn must not flip state back to running after stop.
+      await spawnPromise.catch(() => {});
+      const finalStatus = await runner.status();
+      expect(finalStatus.state).toBe('stopped');
+    });
+  });
 });

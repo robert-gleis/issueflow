@@ -60,12 +60,23 @@ export class ScriptedRunner implements Runner {
       });
     }
 
-    this.state = 'running';
-    this.hasSpawned = true;
+    // If stop() ran while we were awaiting the spawn delay, the runner is
+    // already in `stopping` or `stopped`; do not clobber that.
+    if (this.state === 'starting') {
+      this.state = 'running';
+      this.hasSpawned = true;
+    }
   }
 
   async stop(): Promise<void> {
-    throw new RunnerError('stop-failed', 'not implemented yet');
+    if (this.state === 'idle' || this.state === 'stopped') {
+      return;
+    }
+
+    this.state = 'stopping';
+    this.state = 'stopped';
+    this.stoppedAt = new Date();
+    this.exitCode = this.script.exitCode ?? 0;
   }
 
   async logs(_options?: LogOptions): Promise<LogSnapshot> {
