@@ -198,11 +198,15 @@ ScriptedRunner owns no subprocess, no I/O, no filesystem state. Its only timer i
 
 ## Engine-Isolation Guarantee
 
-The acceptance criterion **"Workflow engine is unaware of tmux (or any specific runtime)"** is satisfied trivially today: `src/workflow/engine.ts` and its peers contain no spawn code, no tmux references, and no imports of `execa` or `child_process`. There is nothing to migrate.
+The acceptance criterion **"Workflow engine is unaware of tmux (or any specific runtime)"** is satisfied trivially today: `src/workflow/engine.ts` and its peers contain no agent-spawning code and no tmux references.
+
+A small clarification on what "runtime" means in this AC: the engine **does** use `execa` in `src/workflow/state-store.ts` to invoke the `gh` CLI for GitHub state-label CRUD. That is not an agent runtime — it is an external-service API call. The Runner abstraction governs *agent execution environments* (tmux pane, local process holding the agent, container hosting the agent), not arbitrary subprocess invocations of fixed external tooling. The AC's intent is preserved.
 
 To prevent regressions, the spec adds an explicit constraint enforced by a regression test (see Testing):
 
-> Files under `src/workflow/` must not import from `src/runners/` and must not reference `tmux`, `child_process`, or `execa` as runtime primitives. When the engine eventually needs to spawn a host binary, it accepts a caller-provided `Runner` instance (analogous to how it already accepts an `AgentAdapter`) and calls only the interface methods.
+> Files under `src/workflow/` must not import from `src/runners/` and must not contain the identifier `tmux`. When the engine eventually needs to spawn a host binary, it accepts a caller-provided `Runner` instance (analogous to how it already accepts an `AgentAdapter`) and calls only the interface methods.
+
+When the engine starts *consuming* `Runner` in a follow-up ticket, the first guard (no imports from `src/runners/`) will be relaxed to "may import only from `src/runners/index.ts`, and only types/interfaces — never concrete classes". The second guard (no `tmux` identifier) stays in force forever.
 
 This is the runner-side mirror of issue #33's engine-isolation constraint for AgentAdapter.
 
@@ -250,8 +254,9 @@ Unit tests live under `tests/unit/`, matching existing repo convention.
   - `status` returns a fresh snapshot on every call (mutating the returned object does not affect later calls).
 - `tests/unit/runner-engine-isolation.test.ts`
   - Reads every `.ts` file under `src/workflow/`.
-  - Asserts none of them contain `from '../runners'`, `from './runners'`, `from '../runners/...'`, or matching variants.
-  - Asserts none of them mention `tmux`, `child_process`, or `execa` as identifiers (string-search is sufficient — the engine today contains none of these; the test guards against regression).
+  - Asserts no file contains an import string that targets `src/runners/`: matches `from '../runners'`, `from '../../runners'`, `from '../runners/...'`, etc. via a regex.
+  - Asserts no file contains the substring `tmux` (case-insensitive).
+  - Does **not** assert anything about `execa` or `child_process`: those are general subprocess primitives, already in legitimate non-agent use under `src/workflow/state-store.ts` to invoke `gh`. The Runner AC is about agent runtimes, not external CLIs.
 
 No integration tests are required for this ticket: there is no subprocess, no filesystem state, no network I/O. Real runners in follow-up tickets will introduce integration coverage when they introduce real side-effects.
 
