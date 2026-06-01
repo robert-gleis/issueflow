@@ -194,4 +194,39 @@ describe('ScriptedRunner', () => {
       expect(finalStatus.state).toBe('stopped');
     });
   });
+
+  describe('reuse and status snapshot freshness', () => {
+    it('allows spawn → stop → spawn (reuse after stop) with a fresh startedAt', async () => {
+      const runner = new ScriptedRunner('r1');
+
+      await runner.spawn({ binary: '/bin/true', args: [], cwd: '/tmp' });
+      const firstStartedAt = (await runner.status()).startedAt;
+      expect(firstStartedAt).toBeInstanceOf(Date);
+
+      await runner.stop();
+
+      // Brief pause so the second startedAt is monotonically distinct from the first.
+      await new Promise<void>((resolve) => setTimeout(resolve, 2));
+
+      await runner.spawn({ binary: '/bin/true', args: [], cwd: '/tmp' });
+      const status = await runner.status();
+
+      expect(status.state).toBe('running');
+      expect(status.stoppedAt).toBeUndefined();
+      expect(status.exitCode).toBeUndefined();
+      expect(status.startedAt).toBeInstanceOf(Date);
+      expect(status.startedAt!.getTime()).toBeGreaterThan(firstStartedAt!.getTime());
+    });
+
+    it('returns a fresh status snapshot on every call', async () => {
+      const runner = new ScriptedRunner('r1');
+      await runner.spawn({ binary: '/bin/true', args: [], cwd: '/tmp' });
+
+      const first = await runner.status();
+      first.state = 'idle';
+
+      const second = await runner.status();
+      expect(second.state).toBe('running');
+    });
+  });
 });
