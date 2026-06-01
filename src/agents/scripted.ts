@@ -42,7 +42,8 @@ export class ScriptedAgentAdapter implements AgentAdapter {
   }
 
   async stop(): Promise<void> {
-    throw new AgentAdapterError('stop-failed', 'not implemented yet');
+    if (this.state === 'idle') return;
+    this.state = 'stopped';
   }
 
   async send(_input: string): Promise<AgentResponse> {

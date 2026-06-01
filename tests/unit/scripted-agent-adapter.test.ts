@@ -37,4 +37,34 @@ describe('ScriptedAgentAdapter', () => {
       });
     });
   });
+
+  describe('stop()', () => {
+    it('transitions running → stopped', async () => {
+      const adapter = new ScriptedAgentAdapter({ steps: [] });
+      await adapter.start({ workingDirectory: '/tmp/work' });
+
+      await adapter.stop();
+      const status = await adapter.status();
+
+      expect(status.state).toBe('stopped');
+    });
+
+    it('is a no-op when never started', async () => {
+      const adapter = new ScriptedAgentAdapter({ steps: [] });
+
+      await expect(adapter.stop()).resolves.toBeUndefined();
+      const status = await adapter.status();
+      expect(status.state).toBe('idle');
+    });
+
+    it('is idempotent when already stopped', async () => {
+      const adapter = new ScriptedAgentAdapter({ steps: [] });
+      await adapter.start({ workingDirectory: '/tmp/work' });
+      await adapter.stop();
+
+      await expect(adapter.stop()).resolves.toBeUndefined();
+      const status = await adapter.status();
+      expect(status.state).toBe('stopped');
+    });
+  });
 });
