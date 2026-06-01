@@ -47,6 +47,13 @@ export class ScriptedRunner implements Runner {
     this.exitCode = undefined;
     this.errorMessage = undefined;
 
+    const delay = this.script.spawnDelayMs ?? 0;
+    if (delay > 0) {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, delay);
+      });
+    }
+
     this.state = 'running';
     this.hasSpawned = true;
   }

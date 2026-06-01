@@ -76,4 +76,21 @@ describe('ScriptedRunner', () => {
       });
     });
   });
+
+  describe('spawn() — spawnDelayMs makes the starting state observable', () => {
+    it('reports "starting" mid-flight and "running" after the delay', async () => {
+      const runner = new ScriptedRunner('r1', { spawnDelayMs: 30 });
+
+      const spawnPromise = runner.spawn({ binary: '/bin/true', args: [], cwd: '/tmp' });
+
+      // First status() is awaited before the spawn delay resolves, so we should see starting.
+      const midFlight = await runner.status();
+      expect(midFlight.state).toBe('starting');
+      expect(midFlight.startedAt).toBeInstanceOf(Date);
+
+      await spawnPromise;
+      const afterSpawn = await runner.status();
+      expect(afterSpawn.state).toBe('running');
+    });
+  });
 });
