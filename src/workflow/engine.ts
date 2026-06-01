@@ -206,10 +206,7 @@ export function createWorkflowEngine(deps: WorkflowEngineDeps): WorkflowEngine {
         fromState: current,
         toState: null,
         action,
-        refused: {
-          code: 'policy-refused',
-          reason: `unhandled action kind: ${action.kind}`
-        }
+        refused: { code: 'policy-refused', reason: action.reason }
       };
     }
   };

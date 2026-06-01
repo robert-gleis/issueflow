@@ -404,3 +404,34 @@ describe('createWorkflowEngine tick: spawn action', () => {
     expect(harness.writeState).not.toHaveBeenCalled();
   });
 });
+
+describe('createWorkflowEngine tick: policy refuse action', () => {
+  it('returns policy-refused with the policy reason and emits only a decision event', async () => {
+    const harness = buildHarness({
+      readState: vi.fn().mockResolvedValue('triaged'),
+      policy: vi
+        .fn<(input: PolicyInput) => EngineAction>()
+        .mockReturnValue({ kind: 'refuse', reason: 'manual hold' })
+    });
+
+    const result = await harness.engine.tick({ repo, issueNumber: 24 });
+
+    expect(result).toEqual({
+      issueNumber: 24,
+      fromState: 'triaged',
+      toState: null,
+      action: { kind: 'refuse', reason: 'manual hold' },
+      refused: { code: 'policy-refused', reason: 'manual hold' }
+    });
+    expect(harness.writeState).not.toHaveBeenCalled();
+    expect(harness.events).toEqual([
+      {
+        kind: 'decision',
+        at: fixedNow,
+        issueNumber: 24,
+        fromState: 'triaged',
+        action: { kind: 'refuse', reason: 'manual hold' }
+      }
+    ]);
+  });
+});
