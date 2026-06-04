@@ -9,15 +9,22 @@ import { runMigrations } from '../../src/state-store/migrations.js';
 import { StateStoreError, type Migration } from '../../src/state-store/types.js';
 
 const tempDirs: string[] = [];
+const openDbs: Database.Database[] = [];
 
 async function makeDb(): Promise<{ db: Database.Database; dir: string }> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'state-store-mig-'));
   tempDirs.push(dir);
   const db = new Database(path.join(dir, 'state.db'));
+  openDbs.push(db);
   return { db, dir };
 }
 
 afterEach(async () => {
+  for (const db of openDbs.splice(0)) {
+    if (db.open) {
+      db.close();
+    }
+  }
   await Promise.all(tempDirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));
 });
 
@@ -93,7 +100,15 @@ describe('runMigrations', () => {
       }
     };
 
-    expect(() => runMigrations(db, [createA, failing])).toThrowError(StateStoreError);
+    try {
+      runMigrations(db, [createA, failing]);
+      throw new Error('did not throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(StateStoreError);
+      expect((error as StateStoreError).code).toBe('migration-failed');
+      expect((error as StateStoreError).message).toContain('2');
+      expect((error as StateStoreError).message).toContain('will-fail');
+    }
 
     const versions = (db.prepare('SELECT version FROM schema_migrations ORDER BY version').all() as Array<{ version: number }>).map((row) => row.version);
     expect(versions).toEqual([1]);
