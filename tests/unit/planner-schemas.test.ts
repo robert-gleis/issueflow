@@ -6,6 +6,10 @@ import {
   teamDefinitionSchema,
   teamRoleSchema
 } from '../../src/planner/schemas/team-definition.js';
+import {
+  childIssueSchema,
+  decompositionPlanSchema
+} from '../../src/planner/schemas/decomposition-plan.js';
 
 describe('PlannerError', () => {
   it('carries code, message, and default empty details', () => {
@@ -83,6 +87,95 @@ describe('teamDefinitionSchema', () => {
 
   it('rejects negative count', () => {
     const result = teamRoleSchema.safeParse({ ...validRole, count: -1 });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('decompositionPlanSchema', () => {
+  const validChild = {
+    title: 'Backend',
+    body: '## Parent\n\n#100\n\n...',
+    labels: ['state:triaged']
+  };
+
+  it('accepts a minimal valid DecompositionPlan', () => {
+    const result = decompositionPlanSchema.safeParse({
+      parent_issue: 100,
+      children: [validChild]
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts empty labels array', () => {
+    const result = childIssueSchema.safeParse({ ...validChild, labels: [] });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects parent_issue of 0', () => {
+    const result = decompositionPlanSchema.safeParse({
+      parent_issue: 0,
+      children: [validChild]
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects negative parent_issue', () => {
+    const result = decompositionPlanSchema.safeParse({
+      parent_issue: -1,
+      children: [validChild]
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects fractional parent_issue', () => {
+    const result = decompositionPlanSchema.safeParse({
+      parent_issue: 1.5,
+      children: [validChild]
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects missing parent_issue', () => {
+    const result = decompositionPlanSchema.safeParse({ children: [validChild] });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects empty children array', () => {
+    const result = decompositionPlanSchema.safeParse({
+      parent_issue: 100,
+      children: []
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects child with missing body', () => {
+    const result = childIssueSchema.safeParse({
+      title: 'A',
+      labels: []
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects child with empty title', () => {
+    const result = childIssueSchema.safeParse({ ...validChild, title: '' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects child with empty body', () => {
+    const result = childIssueSchema.safeParse({ ...validChild, body: '' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects non-string label', () => {
+    const result = childIssueSchema.safeParse({
+      ...validChild,
+      labels: [42 as unknown as string]
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects empty-string label', () => {
+    const result = childIssueSchema.safeParse({ ...validChild, labels: [''] });
     expect(result.success).toBe(false);
   });
 });
