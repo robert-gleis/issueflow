@@ -245,3 +245,61 @@ describe('runPlanner adapter lifecycle', () => {
     expect(sendCalls).toBe(0);
   });
 });
+
+describe('runPlanner adapter failure wrapping', () => {
+  it('wraps adapter.send rejection in PlannerError("adapter-failed", ..., { cause })', async () => {
+    const adapter = new ScriptedAgentAdapter({ steps: [] });
+    const boom = new Error('network down');
+    adapter.send = async () => {
+      throw boom;
+    };
+
+    try {
+      await runPlanner({ adapter, task: 'team', issue });
+      throw new Error('expected runPlanner to throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(PlannerError);
+      expect((err as PlannerError).code).toBe('adapter-failed');
+      expect((err as PlannerError).details.cause).toBe(boom);
+    }
+  });
+
+  it('cleans up an owned adapter when send rejects', async () => {
+    const adapter = new ScriptedAgentAdapter({ steps: [] });
+    adapter.send = async () => {
+      throw new Error('boom');
+    };
+
+    await expect(
+      runPlanner({ adapter, task: 'team', issue })
+    ).rejects.toBeInstanceOf(PlannerError);
+
+    expect((await adapter.status()).state).toBe('stopped');
+  });
+
+  it('wraps adapter.start rejection in PlannerError("adapter-failed", ..., { cause })', async () => {
+    const adapter = new ScriptedAgentAdapter({ steps: [] });
+    const boom = new Error('failed to spawn host');
+    let stopCalls = 0;
+    adapter.start = async () => {
+      throw boom;
+    };
+    const originalStop = adapter.stop.bind(adapter);
+    adapter.stop = async () => {
+      stopCalls++;
+      return originalStop();
+    };
+
+    try {
+      await runPlanner({ adapter, task: 'team', issue });
+      throw new Error('expected runPlanner to throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(PlannerError);
+      expect((err as PlannerError).code).toBe('adapter-failed');
+      expect((err as PlannerError).details.cause).toBe(boom);
+    }
+    // start() never resolved, so the planner never took ownership; the
+    // finally block must not call stop() on an unstarted adapter.
+    expect(stopCalls).toBe(0);
+  });
+});
