@@ -7,6 +7,7 @@ import {
   type WorktreeLocation,
   type WorktreeManagerErrorCode,
   type WorktreeOrphan,
+  type WorktreeOrphanKind,
   type WorktreeOrphanReport,
   type WorktreeOwner,
   type WorktreeOwnerKind,
@@ -17,6 +18,13 @@ describe('WorktreeOwnerKind', () => {
   it('pins the union to agent | team | issue', () => {
     const all: WorktreeOwnerKind[] = ['agent', 'team', 'issue'];
     expect(all).toHaveLength(3);
+  });
+});
+
+describe('WorktreeOrphanKind', () => {
+  it('pins the union to dangling-record | untracked-location', () => {
+    const all: WorktreeOrphanKind[] = ['dangling-record', 'untracked-location'];
+    expect(all).toHaveLength(2);
   });
 });
 

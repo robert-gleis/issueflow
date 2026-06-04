@@ -16,7 +16,6 @@ export interface AcquireInput {
 export interface ReleaseInput {
   id: WorktreeId;
   deleteOnDisk?: boolean;
-  now?: Date;
 }
 
 export interface WorktreeManager {

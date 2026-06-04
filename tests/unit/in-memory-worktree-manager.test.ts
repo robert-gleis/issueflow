@@ -129,6 +129,26 @@ describe('InMemoryWorktreeManager.acquire', () => {
       name: 'WorktreeManagerError',
       code: 'invalid-intent'
     } satisfies Partial<WorktreeManagerError>);
+
+    await expect(
+      manager.acquire({
+        owner: { kind: 'issue', id: '  19  ' },
+        intent: { branchName: 'issue/19', issueNumber: 19 }
+      })
+    ).rejects.toMatchObject({
+      name: 'WorktreeManagerError',
+      code: 'invalid-intent'
+    } satisfies Partial<WorktreeManagerError>);
+
+    await expect(
+      manager.acquire({
+        owner: { kind: 'issue', id: '1e2' },
+        intent: { branchName: 'issue/100', issueNumber: 100 }
+      })
+    ).rejects.toMatchObject({
+      name: 'WorktreeManagerError',
+      code: 'invalid-intent'
+    } satisfies Partial<WorktreeManagerError>);
   });
 
   it('treats a one-sided suggestedPath (one undefined, the other set) as a different intent (strict equality)', async () => {
@@ -251,6 +271,23 @@ describe('InMemoryWorktreeManager.acquire', () => {
 
     expect(await manager.list()).toEqual([]);
     expect(await manager.findByOwner({ kind: 'team', id: 'team-42' })).toBeNull();
+  });
+
+  it('honors an explicit now argument to acquire, overriding the options-level clock', async () => {
+    const manager = new InMemoryWorktreeManager({
+      placement: new InMemoryWorktreePlacement(),
+      idFactory: makeIdFactory(),
+      now: makeClock(['2026-06-04T10:00:00.000Z'])
+    });
+
+    const explicitNow = new Date('2026-06-04T15:00:00.000Z');
+    const record = await manager.acquire({
+      owner: { kind: 'team', id: 'team-42' },
+      intent: { branchName: 'feature/x' },
+      now: explicitNow
+    });
+
+    expect(record.createdAt.toISOString()).toBe('2026-06-04T15:00:00.000Z');
   });
 });
 

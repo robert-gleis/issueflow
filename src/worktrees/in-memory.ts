@@ -40,8 +40,9 @@ function validateIssueOwnerIntent(owner: WorktreeOwner, intent: WorktreeIntent):
   if (owner.kind !== 'issue') {
     return;
   }
-  const expected = Number(owner.id);
-  if (!Number.isInteger(expected) || expected <= 0) {
+  const isValid = /^\d+$/.test(owner.id) && Number(owner.id) > 0;
+  const expected = isValid ? Number(owner.id) : NaN;
+  if (!isValid) {
     throw new WorktreeManagerError(
       'invalid-intent',
       `owner.id must be a positive integer string when owner.kind is 'issue' (got ${JSON.stringify(owner.id)})`
@@ -60,6 +61,7 @@ interface InternalRecord {
   intent: WorktreeIntent;
 }
 
+/** Records returned by `get`, `findByOwner`, and `list` are live references to internal state. Callers must not mutate them. */
 export class InMemoryWorktreeManager implements WorktreeManager {
   private readonly placement: WorktreePlacement;
   private readonly idFactory: () => WorktreeId;
