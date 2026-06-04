@@ -9,10 +9,15 @@ export function openConnection(dbPath: string): Database.Database {
   try {
     fs.mkdirSync(path.dirname(dbPath), { recursive: true });
     const db = new Database(dbPath);
-    db.pragma('journal_mode = WAL');
-    db.pragma('synchronous = NORMAL');
-    db.pragma('foreign_keys = ON');
-    db.pragma('busy_timeout = 5000');
+    try {
+      db.pragma('journal_mode = WAL');
+      db.pragma('synchronous = NORMAL');
+      db.pragma('foreign_keys = ON');
+      db.pragma('busy_timeout = 5000');
+    } catch (pragmaError) {
+      db.close();
+      throw pragmaError;
+    }
     return db;
   } catch (error) {
     const cause = error instanceof Error ? error.message : String(error);
