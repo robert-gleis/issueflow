@@ -123,3 +123,27 @@ function errorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   return String(err);
 }
+
+export async function planTeam(
+  opts: Omit<PlannerOptions, 'task'>
+): Promise<TeamDefinition> {
+  const result = await runPlanner({ ...opts, task: 'team' });
+  if (result.task !== 'team') {
+    // Unreachable — defensive narrowing.
+    throw new PlannerError('invalid-options', 'unexpected planner result for task=team');
+  }
+  return result.data;
+}
+
+export async function decomposeIssue(
+  opts: Omit<PlannerOptions, 'task'>
+): Promise<DecompositionPlan> {
+  const result = await runPlanner({ ...opts, task: 'decomposition' });
+  if (result.task !== 'decomposition') {
+    throw new PlannerError(
+      'invalid-options',
+      'unexpected planner result for task=decomposition'
+    );
+  }
+  return result.data;
+}

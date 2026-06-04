@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import { ScriptedAgentAdapter } from '../../src/agents/scripted.js';
 import { PlannerError } from '../../src/planner/errors.js';
-import { runPlanner } from '../../src/planner/runtime.js';
+import {
+  decomposeIssue,
+  planTeam,
+  runPlanner
+} from '../../src/planner/runtime.js';
 import type { PlannerIssue } from '../../src/planner/types.js';
 import type { TeamDefinition } from '../../src/planner/schemas/team-definition.js';
 import type { DecompositionPlan } from '../../src/planner/schemas/decomposition-plan.js';
@@ -301,5 +305,40 @@ describe('runPlanner adapter failure wrapping', () => {
     // start() never resolved, so the planner never took ownership; the
     // finally block must not call stop() on an unstarted adapter.
     expect(stopCalls).toBe(0);
+  });
+});
+
+describe('planTeam / decomposeIssue', () => {
+  it('planTeam returns the TeamDefinition directly', async () => {
+    const adapter = new ScriptedAgentAdapter({
+      steps: [{ match: /.*/, output: JSON.stringify(validTeam) }]
+    });
+
+    const data = await planTeam({ adapter, issue });
+
+    expect(data).toEqual(validTeam);
+  });
+
+  it('decomposeIssue returns the DecompositionPlan directly', async () => {
+    const adapter = new ScriptedAgentAdapter({
+      steps: [{ match: /.*/, output: JSON.stringify(validDecomp) }]
+    });
+
+    const data = await decomposeIssue({ adapter, issue });
+
+    expect(data).toEqual(validDecomp);
+  });
+
+  it('planTeam forwards maxAttempts', async () => {
+    const adapter = new ScriptedAgentAdapter({
+      steps: [{ match: /.*/, output: JSON.stringify({ roles: [] }) }]
+    });
+
+    await expect(
+      planTeam({ adapter, issue, maxAttempts: 1 })
+    ).rejects.toMatchObject({
+      code: 'invalid-output',
+      details: expect.objectContaining({ attempts: 1 })
+    });
   });
 });
