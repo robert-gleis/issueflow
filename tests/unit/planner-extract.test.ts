@@ -50,6 +50,14 @@ describe('extractJson', () => {
     expect(extractJson(output)).toEqual({ text: 'he said "hi" and {nope}', n: 1 });
   });
 
+  it('throws extract-failed on empty string input', () => {
+    expect(() => extractJson('')).toThrow(PlannerError);
+    try { extractJson(''); } catch (err) {
+      expect((err as PlannerError).code).toBe('extract-failed');
+      expect((err as PlannerError).details.snippet).toBe('');
+    }
+  });
+
   it('throws extract-failed when no JSON is present', () => {
     expect(() => extractJson('no json here, just words')).toThrowError(PlannerError);
     try {

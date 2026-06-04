@@ -4,7 +4,6 @@ import {
   PLANNER_HOSTS,
   PlannerError,
   buildDecompositionPrompt,
-  buildRetryPrompt,
   buildTeamPrompt,
   decomposeIssue,
   decompositionPlanSchema,
@@ -21,7 +20,6 @@ describe('planner public API', () => {
     expect(typeof decomposeIssue).toBe('function');
     expect(typeof buildTeamPrompt).toBe('function');
     expect(typeof buildDecompositionPrompt).toBe('function');
-    expect(typeof buildRetryPrompt).toBe('function');
     expect(typeof extractJson).toBe('function');
     expect(typeof PlannerError).toBe('function');
     expect(teamDefinitionSchema).toBeDefined();

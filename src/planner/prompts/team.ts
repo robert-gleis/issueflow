@@ -1,11 +1,14 @@
 import type { PlannerIssue } from '../types.js';
+import { PLANNER_HOSTS } from '../schemas/team-definition.js';
+
+const hostEnum = PLANNER_HOSTS.map(h => `"${h}"`).join(' | ');
 
 const SCHEMA_DESCRIPTION = `Schema:
 {
   "roles": [
     {
       "name": string,           // human-readable role title, e.g. "Backend Engineer"
-      "host": "pi" | "claude" | "codex" | "cursor",
+      "host": ${hostEnum},
       "responsibility": string, // one-sentence description of what this role does
       "count": integer >= 1     // how many agents of this role to spawn
     }

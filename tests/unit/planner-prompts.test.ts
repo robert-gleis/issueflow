@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { buildTeamPrompt } from '../../src/planner/prompts/team.js';
 import { buildDecompositionPrompt } from '../../src/planner/prompts/decomposition.js';
 import { buildRetryPrompt } from '../../src/planner/prompts/retry.js';
-import { teamDefinitionSchema } from '../../src/planner/schemas/team-definition.js';
+import { PLANNER_HOSTS, teamDefinitionSchema } from '../../src/planner/schemas/team-definition.js';
 import { decompositionPlanSchema } from '../../src/planner/schemas/decomposition-plan.js';
 import type { PlannerIssue } from '../../src/planner/types.js';
 
@@ -51,6 +51,12 @@ describe('buildTeamPrompt', () => {
     );
     for (const field of teamRoleShape) {
       expect(prompt).toContain(field);
+    }
+  });
+
+  it('includes every PLANNER_HOSTS value in the prompt', () => {
+    for (const host of PLANNER_HOSTS) {
+      expect(prompt).toContain(host);
     }
   });
 });

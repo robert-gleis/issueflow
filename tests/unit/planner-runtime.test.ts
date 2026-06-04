@@ -229,6 +229,19 @@ describe('runPlanner adapter lifecycle', () => {
     expect((await adapter.status()).state).toBe('running');
   });
 
+  it('starts a stopped adapter and stops it on success', async () => {
+    const adapter = new ScriptedAgentAdapter({
+      steps: [{ match: /.*/, output: JSON.stringify(validTeam) }]
+    });
+    await adapter.start({ workingDirectory: '/tmp' });
+    await adapter.stop();
+    expect((await adapter.status()).state).toBe('stopped');
+
+    await runPlanner({ adapter, task: 'team', issue });
+
+    expect((await adapter.status()).state).toBe('stopped');
+  });
+
   it('throws adapter-not-ready and never sends when adapter is in an unusable state', async () => {
     const adapter = new ScriptedAgentAdapter({ steps: [] });
     let sendCalls = 0;

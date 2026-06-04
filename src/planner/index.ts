@@ -23,8 +23,7 @@ export type {
 export { runPlanner, planTeam, decomposeIssue } from './runtime.js';
 export {
   buildTeamPrompt,
-  buildDecompositionPrompt,
-  buildRetryPrompt
+  buildDecompositionPrompt
 } from './prompts/index.js';
 export { extractJson } from './extract.js';
 export { PlannerError } from './errors.js';

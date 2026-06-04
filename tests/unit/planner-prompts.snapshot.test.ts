@@ -3,9 +3,9 @@ import { z } from 'zod';
 
 import {
   buildDecompositionPrompt,
-  buildRetryPrompt,
   buildTeamPrompt
 } from '../../src/planner/prompts/index.js';
+import { buildRetryPrompt } from '../../src/planner/prompts/retry.js';
 import type { PlannerIssue } from '../../src/planner/types.js';
 
 const issue: PlannerIssue = {
