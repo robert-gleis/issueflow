@@ -65,4 +65,13 @@ describe('buildCli', () => {
     const subcommands = engineCommand?.commands.map((command) => command.name()) ?? [];
     expect(subcommands).toEqual(expect.arrayContaining(['tick']));
   });
+
+  it('registers the watch command group with run and once subcommands', () => {
+    const program = buildCli();
+    const watchCommand = program.commands.find((command) => command.name() === 'watch');
+
+    expect(watchCommand).toBeDefined();
+    const subcommands = watchCommand?.commands.map((command) => command.name()) ?? [];
+    expect(subcommands).toEqual(expect.arrayContaining(['run', 'once']));
+  });
 });
