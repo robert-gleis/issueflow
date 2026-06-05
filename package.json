@@ -13,7 +13,7 @@
     "test:watch": "vitest"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.4"
   },
   "dependencies": {
     "@inquirer/prompts": "^7.8.6",
