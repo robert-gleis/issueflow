@@ -108,6 +108,19 @@ describe('buildCli', () => {
     expect(subcommands).toEqual(expect.arrayContaining(['generate', 'show', 'edit', 'approve']));
   });
 
+  it('registers the decomposition command group with generate, show, edit, and approve subcommands', () => {
+    const program = buildCli();
+    const decompositionCommand = program.commands.find(
+      (command) => command.name() === 'decomposition'
+    );
+
+    expect(decompositionCommand).toBeDefined();
+    const subcommands = decompositionCommand?.commands.map((command) => command.name()) ?? [];
+    expect(subcommands).toEqual(
+      expect.arrayContaining(['generate', 'show', 'edit', 'approve'])
+    );
+  });
+
   it('registers the team command group with start, status, and stop subcommands', () => {
     const program = buildCli();
     const teamCommand = program.commands.find((command) => command.name() === 'team');
@@ -165,6 +178,19 @@ describe('buildCli', () => {
 
     showCommand?.exitOverride();
     expect(() => showCommand?.parse(['--issue', '31abc'], { from: 'user' })).toThrow(/positive integer/);
+  });
+
+  it('registers the merge command group with evaluate and show subcommands', () => {
+    const program = buildCli();
+    const mergeCommand = program.commands.find((command) => command.name() === 'merge');
+
+    expect(mergeCommand).toBeDefined();
+    const subcommands = mergeCommand?.commands.map((command) => command.name()) ?? [];
+    expect(subcommands).toEqual(expect.arrayContaining(['evaluate', 'show']));
+
+    const optionFlags = mergeCommand?.options.map((option) => option.long) ?? [];
+    expect(optionFlags).toContain('--merge-method');
+    expect(optionFlags).toContain('--issue');
   });
 
   it('registers the replay command group with show subcommand', () => {
