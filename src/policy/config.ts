@@ -1,7 +1,6 @@
 import fs from 'node:fs/promises';
-import path from 'node:path';
 
-import { defaultConfigPath, loadConfig, parseAutonomousModeFromContent } from '../config/load.js';
+import { defaultConfigPath, loadConfig, parseAutonomousModeFromContent, repoConfigPath } from '../config/load.js';
 
 export interface ResolveAutonomousModeDeps {
   globalConfigPath?: string;
@@ -12,10 +11,10 @@ async function readRepoAutonomousMode(
   repoRoot: string,
   readFile: typeof fs.readFile
 ): Promise<boolean | undefined> {
-  const repoConfigPath = path.join(repoRoot, '.issueflow', 'config.yaml');
+  const configPath = repoConfigPath(repoRoot);
   try {
-    const content = await readFile(repoConfigPath, 'utf8');
-    return parseAutonomousModeFromContent(content, repoConfigPath);
+    const content = await readFile(configPath, 'utf8');
+    return parseAutonomousModeFromContent(content, configPath);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return undefined;
