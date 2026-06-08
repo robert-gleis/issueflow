@@ -21,8 +21,23 @@ describe('event-log types', () => {
       'verification.passed',
       'team.planned',
       'plan.approved',
-      'decomposition.applied'
+      'decomposition.applied',
+      'workflow.transition',
+      'workflow.refused',
+      'review.gate.completed',
+      'pr.created'
     ]);
+  });
+
+  it('includes workflow timeline event types', () => {
+    expect(EVENT_TYPES).toEqual(
+      expect.arrayContaining([
+        'workflow.transition',
+        'workflow.refused',
+        'review.gate.completed',
+        'pr.created'
+      ])
+    );
   });
 
   it('pins CURRENT_EVENT_SCHEMA_VERSION to 1', () => {

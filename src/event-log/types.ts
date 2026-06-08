@@ -6,7 +6,11 @@ export const EVENT_TYPES = [
   'verification.passed',
   'team.planned',
   'plan.approved',
-  'decomposition.applied'
+  'decomposition.applied',
+  'workflow.transition',
+  'workflow.refused',
+  'review.gate.completed',
+  'pr.created'
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];
