@@ -64,4 +64,29 @@ watcher:
 `);
     await expect(loadConfig(file)).rejects.toThrow(/autonomous_mode/);
   });
+
+  it('defaults state_backend to github-labels', async () => {
+    const config = await loadConfig('/nonexistent/config.yaml');
+    expect(config.state_backend).toBe('github-labels');
+  });
+
+  it('parses state_backend local', async () => {
+    const file = await writeTempConfig(`state_backend: local
+`);
+    const config = await loadConfig(file);
+    expect(config.state_backend).toBe('local');
+  });
+
+  it('parses state_backend github-labels explicitly', async () => {
+    const file = await writeTempConfig(`state_backend: github-labels
+`);
+    const config = await loadConfig(file);
+    expect(config.state_backend).toBe('github-labels');
+  });
+
+  it('throws on invalid state_backend value', async () => {
+    const file = await writeTempConfig(`state_backend: s3
+`);
+    await expect(loadConfig(file)).rejects.toThrow(/state_backend/);
+  });
 });

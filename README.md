@@ -10,7 +10,9 @@ IssueFlow drives every issue through a fixed state machine:
 triaged → planned → approved → implementing → reviewing → verifying → pr-ready → merged → closed
 ```
 
-State is stored as a single `state:*` label on the GitHub issue — no external database needed for the workflow itself. From triage to merge, every step is enforced by the Workflow Engine; agents cannot skip or self-certify past gates.
+By default, state is stored as a single `state:*` label on the GitHub issue — no external database needed for the workflow itself. From triage to merge, every step is enforced by the Workflow Engine; agents cannot skip or self-certify past gates.
+
+If you prefer not to write to GitHub issues, set `state_backend: local` in your global config (see [Global configuration](#global-configuration)). State is then stored in files under `~/.issueflow/state/` instead.
 
 ## Prerequisites
 
@@ -220,16 +222,7 @@ ISSUEFLOW_ENGINE=1 issueflow watch run
 ISSUEFLOW_ENGINE=1 issueflow watch run --interval 30 --trigger-label state:triaged
 ```
 
-Configure defaults in `.issueflow/config.json`:
-
-```json
-{
-  "watcher": {
-    "interval_seconds": 60,
-    "trigger_label": "state:triaged"
-  }
-}
-```
+Configure defaults in `~/.issueflow/config.yaml` (see [Global configuration](#global-configuration)).
 
 ---
 
@@ -326,6 +319,35 @@ Pre-built integration assets live under `integrations/`:
 | `integrations/cursor/commands/issueflow.md` | Cursor command |
 
 See [docs/host-integrations.md](docs/host-integrations.md) for installation instructions.
+
+---
+
+## Global configuration
+
+IssueFlow reads `~/.issueflow/config.yaml` on startup. All fields are optional — defaults are used for any missing key.
+
+```yaml
+# ~/.issueflow/config.yaml
+
+# Where workflow state is persisted.
+#
+#   github-labels (default) — writes a state:* label to the GitHub issue on
+#                             every transition. Requires gh CLI access and
+#                             write permission on the repository.
+#
+#   local — stores state in ~/.issueflow/state/<owner>/<repo>/<issue-number>
+#           instead. No GitHub writes are made for state tracking.
+state_backend: github-labels
+
+# Autonomous watcher defaults (used by `issueflow watch`).
+watcher:
+  interval_seconds: 60
+  trigger_label: "state:triaged"
+
+# Set to true to allow the engine to auto-approve team plans without
+# a human review gate.
+autonomous_mode: false
+```
 
 ---
 

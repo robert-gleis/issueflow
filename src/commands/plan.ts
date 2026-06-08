@@ -27,10 +27,12 @@ import { InvalidTransitionError, type WorkflowState } from '../workflow/state-ma
 import {
   InvalidStateLabelError,
   MultipleStateLabelsError,
-  readState as defaultReadState,
-  writeState as defaultWriteState,
   type RepoRef
 } from '../workflow/state-store.js';
+import {
+  readState as defaultReadState,
+  writeState as defaultWriteState
+} from '../workflow/configurable-state.js';
 
 export type WriteChannel = 'stdout' | 'stderr';
 

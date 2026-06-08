@@ -6,6 +6,7 @@ import {
   DEFAULT_CONFIG,
   MIN_INTERVAL_SECONDS,
   type IssueflowConfig,
+  type StateBackend,
   type WatcherConfig
 } from './types.js';
 
@@ -60,6 +61,21 @@ export function parseAutonomousModeFromContent(
   return undefined;
 }
 
+export function parseStateBackendFromContent(
+  content: string,
+  configPath: string
+): StateBackend | undefined {
+  for (const raw of content.split('\n')) {
+    const line = raw.trimEnd();
+    const match = line.match(/^state_backend:\s*(.+)$/);
+    if (!match) continue;
+    const value = match[1].replace(/^["']|["']$/g, '').trim();
+    if (value === 'github-labels' || value === 'local') return value;
+    throw new Error(`${configPath}: state_backend must be "github-labels" or "local"`);
+  }
+  return undefined;
+}
+
 function validateWatcher(configPath: string, watcher: WatcherConfig): void {
   if (!Number.isFinite(watcher.interval_seconds) || watcher.interval_seconds < MIN_INTERVAL_SECONDS) {
     throw new Error(`${configPath}: watcher.interval_seconds must be >= ${MIN_INTERVAL_SECONDS}`);
@@ -88,5 +104,7 @@ export async function loadConfig(configPath = defaultConfigPath()): Promise<Issu
   validateWatcher(configPath, watcher);
   const autonomous_mode =
     parseAutonomousModeFromContent(content, configPath) ?? DEFAULT_CONFIG.autonomous_mode;
-  return { watcher, autonomous_mode };
+  const state_backend =
+    parseStateBackendFromContent(content, configPath) ?? DEFAULT_CONFIG.state_backend;
+  return { watcher, autonomous_mode, state_backend };
 }
