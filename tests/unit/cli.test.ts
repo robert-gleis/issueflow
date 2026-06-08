@@ -165,4 +165,13 @@ describe('buildCli', () => {
     showCommand?.exitOverride();
     expect(() => showCommand?.parse(['--issue', '31abc'], { from: 'user' })).toThrow(/positive integer/);
   });
+
+  it('registers the replay command group with show subcommand', () => {
+    const program = buildCli();
+    const replayCommand = program.commands.find((command) => command.name() === 'replay');
+
+    expect(replayCommand).toBeDefined();
+    const subcommands = replayCommand?.commands.map((command) => command.name()) ?? [];
+    expect(subcommands).toEqual(expect.arrayContaining(['show']));
+  });
 });

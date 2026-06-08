@@ -11,8 +11,10 @@ export const EVENT_TYPES = [
   'team.member.blocked',
   'team.tearing-down',
   'team.torn-down',
+  'workflow.decision',
   'workflow.transition',
   'workflow.refused',
+  'agent.log.captured',
   'review.gate.completed',
   'pr.created'
 ] as const;
@@ -47,6 +49,7 @@ export interface EventQuery {
   issueId?: number;
   workflowId?: string;
   limit?: number;
+  order?: 'asc' | 'desc';
 }
 
 export type EventLogErrorCode =

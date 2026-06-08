@@ -12,7 +12,7 @@ import {
 } from '../../src/event-log/types.js';
 
 describe('event-log types', () => {
-  it('exports the canonical event types including team lifecycle events', () => {
+  it('exports canonical event types including team lifecycle, timeline, and replay extensions', () => {
     expect([...EVENT_TYPES]).toEqual([
       'agent.created',
       'agent.stopped',
@@ -26,8 +26,10 @@ describe('event-log types', () => {
       'team.member.blocked',
       'team.tearing-down',
       'team.torn-down',
+      'workflow.decision',
       'workflow.transition',
       'workflow.refused',
+      'agent.log.captured',
       'review.gate.completed',
       'pr.created'
     ]);
@@ -52,6 +54,12 @@ describe('event-log types', () => {
         'review.gate.completed',
         'pr.created'
       ])
+    );
+  });
+
+  it('includes session replay event types', () => {
+    expect(EVENT_TYPES).toEqual(
+      expect.arrayContaining(['workflow.decision', 'agent.log.captured'])
     );
   });
 
