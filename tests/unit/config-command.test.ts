@@ -1,0 +1,156 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { Command } from 'commander';
+
+import { registerConfigCommands, type ConfigCommandDeps } from '../../src/commands/config.js';
+import { DEFAULT_CONFIG } from '../../src/config/types.js';
+
+interface CapturedIo {
+  stdout: string[];
+  stderr: string[];
+  exitCode: number | null;
+}
+
+interface Harness {
+  program: Command;
+  io: CapturedIo;
+  deps: ConfigCommandDeps;
+}
+
+function buildHarness(overrides: Partial<ConfigCommandDeps> = {}): Harness {
+  const io: CapturedIo = { stdout: [], stderr: [], exitCode: null };
+  const deps: ConfigCommandDeps = {
+    loadConfigWithOrigins: vi.fn().mockResolvedValue({
+      config: structuredClone(DEFAULT_CONFIG),
+      origins: {
+        state_backend: 'default',
+        autonomous_mode: 'default',
+        'watcher.interval_seconds': 'default',
+        'watcher.trigger_label': 'default'
+      }
+    }),
+    setConfigKey: vi.fn().mockResolvedValue(undefined),
+    initConfigFile: vi.fn().mockResolvedValue(undefined),
+    tryResolveRepoRoot: vi.fn().mockResolvedValue('/repo/root'),
+    globalConfigPath: () => '/home/user/.issueflow/config.yaml',
+    repoConfigPath: (root: string) => `${root}/.issueflow/config.yaml`,
+    write: (msg) => io.stdout.push(msg),
+    writeError: (msg) => io.stderr.push(msg),
+    setExitCode: (code) => { io.exitCode = code; },
+    ...overrides
+  };
+  const program = new Command();
+  program.exitOverride();
+  registerConfigCommands(program, deps);
+  return { program, io, deps };
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe('config get', () => {
+  it('prints the resolved value for a valid key', async () => {
+    const { program, io } = buildHarness();
+    await program.parseAsync(['config', 'get', 'state_backend'], { from: 'user' });
+    expect(io.stdout.join('')).toContain('github-labels');
+  });
+
+  it('sets exit code 1 and prints error for unknown key', async () => {
+    const { program, io } = buildHarness();
+    await program.parseAsync(['config', 'get', 'unknown_key'], { from: 'user' });
+    expect(io.exitCode).toBe(1);
+    expect(io.stderr.join('')).toMatch(/unknown key/i);
+  });
+});
+
+describe('config set', () => {
+  it('calls setConfigKey with the global path by default', async () => {
+    const { program, deps } = buildHarness();
+    await program.parseAsync(['config', 'set', 'state_backend', 'local'], { from: 'user' });
+    expect(deps.setConfigKey).toHaveBeenCalledWith(
+      '/home/user/.issueflow/config.yaml',
+      'state_backend',
+      'local'
+    );
+  });
+
+  it('calls setConfigKey with the repo path when --repo is given', async () => {
+    const { program, deps } = buildHarness();
+    await program.parseAsync(['config', 'set', 'state_backend', 'local', '--repo'], { from: 'user' });
+    expect(deps.setConfigKey).toHaveBeenCalledWith(
+      '/repo/root/.issueflow/config.yaml',
+      'state_backend',
+      'local'
+    );
+  });
+
+  it('sets exit code 1 for an invalid value', async () => {
+    const { program, io } = buildHarness();
+    await program.parseAsync(['config', 'set', 'state_backend', 'badvalue'], { from: 'user' });
+    expect(io.exitCode).toBe(1);
+    expect(io.stderr.join('')).toMatch(/invalid value/i);
+  });
+
+  it('sets exit code 1 for --repo when not in a git repo', async () => {
+    const { program, io } = buildHarness({
+      tryResolveRepoRoot: vi.fn().mockResolvedValue(null)
+    });
+    await program.parseAsync(['config', 'set', 'state_backend', 'local', '--repo'], { from: 'user' });
+    expect(io.exitCode).toBe(1);
+    expect(io.stderr.join('')).toMatch(/not inside a git repo/i);
+  });
+
+  it('sets exit code 1 for an unknown key', async () => {
+    const { program, io } = buildHarness();
+    await program.parseAsync(['config', 'set', 'bad_key', 'value'], { from: 'user' });
+    expect(io.exitCode).toBe(1);
+    expect(io.stderr.join('')).toMatch(/unknown key/i);
+  });
+});
+
+describe('config show', () => {
+  it('prints all four keys with their origins', async () => {
+    const { program, io } = buildHarness({
+      loadConfigWithOrigins: vi.fn().mockResolvedValue({
+        config: structuredClone(DEFAULT_CONFIG),
+        origins: {
+          state_backend: 'global',
+          autonomous_mode: 'default',
+          'watcher.interval_seconds': 'repo',
+          'watcher.trigger_label': 'default'
+        }
+      })
+    });
+    await program.parseAsync(['config', 'show'], { from: 'user' });
+    const out = io.stdout.join('');
+    expect(out).toContain('state_backend');
+    expect(out).toContain('[global]');
+    expect(out).toContain('watcher.interval_seconds');
+    expect(out).toContain('[repo]');
+    expect(out).toContain('[default]');
+  });
+});
+
+describe('config init', () => {
+  it('calls initConfigFile with the global path by default', async () => {
+    const { program, deps } = buildHarness();
+    await program.parseAsync(['config', 'init'], { from: 'user' });
+    expect(deps.initConfigFile).toHaveBeenCalledWith('/home/user/.issueflow/config.yaml');
+  });
+
+  it('calls initConfigFile with the repo path when --repo is given', async () => {
+    const { program, deps } = buildHarness();
+    await program.parseAsync(['config', 'init', '--repo'], { from: 'user' });
+    expect(deps.initConfigFile).toHaveBeenCalledWith('/repo/root/.issueflow/config.yaml');
+  });
+
+  it('sets exit code 1 for --repo when not in a git repo', async () => {
+    const { program, io } = buildHarness({
+      tryResolveRepoRoot: vi.fn().mockResolvedValue(null)
+    });
+    await program.parseAsync(['config', 'init', '--repo'], { from: 'user' });
+    expect(io.exitCode).toBe(1);
+    expect(io.stderr.join('')).toMatch(/not inside a git repo/i);
+  });
+});
