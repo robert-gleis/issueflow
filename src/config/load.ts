@@ -7,8 +7,11 @@ import {
   MIN_INTERVAL_SECONDS,
   type IssueflowConfig,
   type StateBackend,
-  type WatcherConfig
+  type WatcherConfig,
+  type WatcherIntakeMode,
+  type WatcherSource
 } from './types.js';
+import { WORKFLOW_STATES, type WorkflowState } from '../workflow/state-machine.js';
 
 export type ConfigOrigin = 'default' | 'global' | 'repo';
 
@@ -18,6 +21,9 @@ export interface ConfigWithOrigins {
     state_backend: ConfigOrigin;
     autonomous_mode: ConfigOrigin;
     'watcher.interval_seconds': ConfigOrigin;
+    'watcher.source': ConfigOrigin;
+    'watcher.intake_mode': ConfigOrigin;
+    'watcher.initial_state': ConfigOrigin;
     'watcher.trigger_label': ConfigOrigin;
   };
 }
@@ -59,6 +65,12 @@ function parseWatcherBlock(lines: string[]): Partial<WatcherConfig> {
 
     if (key === 'interval_seconds') {
       result.interval_seconds = Number.parseInt(value, 10);
+    } else if (key === 'source') {
+      result.source = value as WatcherSource;
+    } else if (key === 'intake_mode') {
+      result.intake_mode = value as WatcherIntakeMode;
+    } else if (key === 'initial_state') {
+      result.initial_state = value as Exclude<WorkflowState, 'closed'>;
     } else if (key === 'trigger_label') {
       result.trigger_label = value;
     }
@@ -101,6 +113,15 @@ export function parseStateBackendFromContent(
 function validateWatcher(configPath: string, watcher: WatcherConfig): void {
   if (!Number.isFinite(watcher.interval_seconds) || watcher.interval_seconds < MIN_INTERVAL_SECONDS) {
     throw new Error(`${configPath}: watcher.interval_seconds must be >= ${MIN_INTERVAL_SECONDS}`);
+  }
+  if (watcher.source !== 'assigned-to-me' && watcher.source !== 'label') {
+    throw new Error(`${configPath}: watcher.source must be "assigned-to-me" or "label"`);
+  }
+  if (watcher.intake_mode !== 'confirm' && watcher.intake_mode !== 'auto') {
+    throw new Error(`${configPath}: watcher.intake_mode must be "confirm" or "auto"`);
+  }
+  if (!WORKFLOW_STATES.includes(watcher.initial_state) || watcher.initial_state === 'closed') {
+    throw new Error(`${configPath}: watcher.initial_state must be a non-terminal workflow state`);
   }
   if (!watcher.trigger_label.trim()) {
     throw new Error(`${configPath}: watcher.trigger_label must be non-empty`);
@@ -212,6 +233,9 @@ export async function loadConfigWithOrigins(
       state_backend: origin(repoRaw.state_backend, globalRaw.state_backend),
       autonomous_mode: origin(repoRaw.autonomous_mode, globalRaw.autonomous_mode),
       'watcher.interval_seconds': origin(repoRaw.watcher?.interval_seconds, globalRaw.watcher?.interval_seconds),
+      'watcher.source': origin(repoRaw.watcher?.source, globalRaw.watcher?.source),
+      'watcher.intake_mode': origin(repoRaw.watcher?.intake_mode, globalRaw.watcher?.intake_mode),
+      'watcher.initial_state': origin(repoRaw.watcher?.initial_state, globalRaw.watcher?.initial_state),
       'watcher.trigger_label': origin(repoRaw.watcher?.trigger_label, globalRaw.watcher?.trigger_label)
     }
   };

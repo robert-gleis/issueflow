@@ -35,6 +35,18 @@ describe('loadConfig', () => {
     expect(config).toEqual(DEFAULT_CONFIG);
   });
 
+  it('defaults watcher intake to assigned-to-me confirm with local state', async () => {
+    const config = await loadConfig('/nonexistent/config.yaml');
+    expect(config.state_backend).toBe('local');
+    expect(config.watcher).toEqual({
+      interval_seconds: 60,
+      source: 'assigned-to-me',
+      intake_mode: 'confirm',
+      initial_state: 'triaged',
+      trigger_label: 'triaged'
+    });
+  });
+
   it('parses watcher interval and trigger label', async () => {
     const file = await writeTempConfig(`watcher:
   interval_seconds: 120
@@ -45,11 +57,50 @@ describe('loadConfig', () => {
     expect(config.watcher.trigger_label).toBe('state:planned');
   });
 
+  it('parses all watcher intake keys', async () => {
+    const file = await writeTempConfig(`watcher:
+  interval_seconds: 120
+  source: label
+  intake_mode: auto
+  initial_state: planned
+  trigger_label: "ready"
+`);
+    const config = await loadConfig(file);
+    expect(config.watcher).toEqual({
+      interval_seconds: 120,
+      source: 'label',
+      intake_mode: 'auto',
+      initial_state: 'planned',
+      trigger_label: 'ready'
+    });
+  });
+
   it('throws on interval below minimum', async () => {
     const file = await writeTempConfig(`watcher:
   interval_seconds: 2
 `);
     await expect(loadConfig(file)).rejects.toThrow(/interval_seconds/);
+  });
+
+  it('throws on invalid watcher source', async () => {
+    const file = await writeTempConfig(`watcher:
+  source: mine
+`);
+    await expect(loadConfig(file)).rejects.toThrow(/watcher.source/);
+  });
+
+  it('throws on invalid watcher intake mode', async () => {
+    const file = await writeTempConfig(`watcher:
+  intake_mode: maybe
+`);
+    await expect(loadConfig(file)).rejects.toThrow(/watcher.intake_mode/);
+  });
+
+  it('throws when watcher initial state is closed', async () => {
+    const file = await writeTempConfig(`watcher:
+  initial_state: closed
+`);
+    await expect(loadConfig(file)).rejects.toThrow(/watcher.initial_state/);
   });
 
   it('defaults autonomous_mode to false', async () => {
@@ -73,9 +124,9 @@ watcher:
     await expect(loadConfig(file)).rejects.toThrow(/autonomous_mode/);
   });
 
-  it('defaults state_backend to github-labels', async () => {
+  it('defaults state_backend to local', async () => {
     const config = await loadConfig('/nonexistent/config.yaml');
-    expect(config.state_backend).toBe('github-labels');
+    expect(config.state_backend).toBe('local');
   });
 
   it('parses state_backend local', async () => {
@@ -109,10 +160,10 @@ describe('loadConfig with repoRoot', () => {
   it('returns defaults when neither global nor repo config exists', async () => {
     const dir = await makeTempDir();
     const config = await loadConfig(path.join(dir, 'global.yaml'), dir);
-    expect(config.state_backend).toBe('github-labels');
+    expect(config.state_backend).toBe('local');
     expect(config.autonomous_mode).toBe(false);
     expect(config.watcher.interval_seconds).toBe(60);
-    expect(config.watcher.trigger_label).toBe('state:triaged');
+    expect(config.watcher.trigger_label).toBe('triaged');
   });
 
   it('repo config overrides global config per-field', async () => {
@@ -144,6 +195,9 @@ describe('loadConfigWithOrigins', () => {
     expect(origins.state_backend).toBe('default');
     expect(origins.autonomous_mode).toBe('default');
     expect(origins['watcher.interval_seconds']).toBe('default');
+    expect(origins['watcher.source']).toBe('default');
+    expect(origins['watcher.intake_mode']).toBe('default');
+    expect(origins['watcher.initial_state']).toBe('default');
     expect(origins['watcher.trigger_label']).toBe('default');
   });
 
