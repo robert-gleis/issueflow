@@ -20,7 +20,11 @@ export interface WatcherConfig {
   trigger_label: string;
 }
 
-export type StateBackend = 'github-labels' | 'local';
+export const STATE_BACKENDS = ['local', 'github-labels'] as const;
+export type StateBackend = (typeof STATE_BACKENDS)[number];
+export function isStateBackend(value: string): value is StateBackend {
+  return (STATE_BACKENDS as readonly string[]).includes(value);
+}
 
 export interface IssueflowConfig {
   watcher: WatcherConfig;

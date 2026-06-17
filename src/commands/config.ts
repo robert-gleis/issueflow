@@ -6,7 +6,7 @@ import {
   repoConfigPath as defaultRepoConfigPath,
   type ConfigWithOrigins
 } from '../config/load.js';
-import { isWatcherIntakeMode, isWatcherSource } from '../config/types.js';
+import { isStateBackend, isWatcherIntakeMode, isWatcherSource } from '../config/types.js';
 import { initConfigFile as defaultInitConfigFile, setConfigKey as defaultSetConfigKey } from '../config/write.js';
 import { resolveRepoRoot } from '../core/git.js';
 import { isNonTerminalWorkflowState } from '../workflow/state-machine.js';
@@ -61,7 +61,7 @@ function isValidKey(key: string): key is ConfigKey {
 
 function validateValue(key: ConfigKey, value: string): string | null {
   if (key === 'state_backend') {
-    if (value !== 'github-labels' && value !== 'local') {
+    if (!isStateBackend(value)) {
       return `invalid value "${value}" for state_backend — must be "github-labels" or "local"`;
     }
   } else if (key === 'autonomous_mode') {

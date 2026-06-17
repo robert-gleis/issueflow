@@ -5,6 +5,7 @@ import path from 'node:path';
 import {
   DEFAULT_CONFIG,
   MIN_INTERVAL_SECONDS,
+  isStateBackend,
   isWatcherIntakeMode,
   isWatcherSource,
   type IssueflowConfig,
@@ -112,7 +113,7 @@ export function parseStateBackendFromContent(
     const match = line.match(/^state_backend:\s*(.+)$/);
     if (!match) continue;
     const value = match[1].replace(/^["']|["']$/g, '').trim();
-    if (value === 'github-labels' || value === 'local') return value;
+    if (isStateBackend(value)) return value;
     throw new Error(`${configPath}: state_backend must be "github-labels" or "local"`);
   }
   return undefined;
