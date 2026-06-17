@@ -4,6 +4,8 @@ import { Command, InvalidArgumentError, Option } from 'commander';
 import { defaultConfigPath, loadConfig as defaultLoadConfig } from '../config/load.js';
 import {
   MIN_INTERVAL_SECONDS,
+  isWatcherIntakeMode,
+  isWatcherSource,
   type IssueflowConfig,
   type WatcherConfig,
   type WatcherIntakeMode,
@@ -91,14 +93,14 @@ function parseIntervalSeconds(value: string): number {
 }
 
 function parseSource(value: string): WatcherSource {
-  if (value !== 'assigned-to-me' && value !== 'label') {
+  if (!isWatcherSource(value)) {
     throw new InvalidArgumentError('source must be "assigned-to-me" or "label"');
   }
   return value;
 }
 
 function parseIntakeMode(value: string): WatcherIntakeMode {
-  if (value !== 'confirm' && value !== 'auto') {
+  if (!isWatcherIntakeMode(value)) {
     throw new InvalidArgumentError('intake mode must be "confirm" or "auto"');
   }
   return value;

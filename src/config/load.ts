@@ -5,13 +5,13 @@ import path from 'node:path';
 import {
   DEFAULT_CONFIG,
   MIN_INTERVAL_SECONDS,
+  isWatcherIntakeMode,
+  isWatcherSource,
   type IssueflowConfig,
   type StateBackend,
-  type WatcherConfig,
-  type WatcherIntakeMode,
-  type WatcherSource
+  type WatcherConfig
 } from './types.js';
-import { WORKFLOW_STATES, type WorkflowState } from '../workflow/state-machine.js';
+import { isNonTerminalWorkflowState } from '../workflow/state-machine.js';
 
 export type ConfigOrigin = 'default' | 'global' | 'repo';
 
@@ -118,18 +118,14 @@ export function parseStateBackendFromContent(
   return undefined;
 }
 
-function isNonTerminalWorkflowState(value: string): value is Exclude<WorkflowState, 'closed'> {
-  return WORKFLOW_STATES.includes(value as WorkflowState) && value !== 'closed';
-}
-
 function validateWatcher(configPath: string, watcher: RawWatcherConfig): WatcherConfig {
   if (!Number.isFinite(watcher.interval_seconds) || watcher.interval_seconds < MIN_INTERVAL_SECONDS) {
     throw new Error(`${configPath}: watcher.interval_seconds must be >= ${MIN_INTERVAL_SECONDS}`);
   }
-  if (watcher.source !== 'assigned-to-me' && watcher.source !== 'label') {
+  if (!isWatcherSource(watcher.source)) {
     throw new Error(`${configPath}: watcher.source must be "assigned-to-me" or "label"`);
   }
-  if (watcher.intake_mode !== 'confirm' && watcher.intake_mode !== 'auto') {
+  if (!isWatcherIntakeMode(watcher.intake_mode)) {
     throw new Error(`${configPath}: watcher.intake_mode must be "confirm" or "auto"`);
   }
   if (!isNonTerminalWorkflowState(watcher.initial_state)) {

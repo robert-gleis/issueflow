@@ -6,8 +6,10 @@ import {
   repoConfigPath as defaultRepoConfigPath,
   type ConfigWithOrigins
 } from '../config/load.js';
+import { isWatcherIntakeMode, isWatcherSource } from '../config/types.js';
 import { initConfigFile as defaultInitConfigFile, setConfigKey as defaultSetConfigKey } from '../config/write.js';
 import { resolveRepoRoot } from '../core/git.js';
+import { isNonTerminalWorkflowState } from '../workflow/state-machine.js';
 
 export interface ConfigCommandDeps {
   loadConfigWithOrigins: (globalPath?: string, repoRoot?: string) => Promise<ConfigWithOrigins>;
@@ -72,17 +74,16 @@ function validateValue(key: ConfigKey, value: string): string | null {
       return `invalid value "${value}" for watcher.interval_seconds — must be an integer >= 5`;
     }
   } else if (key === 'watcher.source') {
-    if (value !== 'assigned-to-me' && value !== 'label') {
-      return `invalid value "${value}" for watcher.source - must be "assigned-to-me" or "label"`;
+    if (!isWatcherSource(value)) {
+      return `invalid value "${value}" for watcher.source — must be "assigned-to-me" or "label"`;
     }
   } else if (key === 'watcher.intake_mode') {
-    if (value !== 'confirm' && value !== 'auto') {
-      return `invalid value "${value}" for watcher.intake_mode - must be "confirm" or "auto"`;
+    if (!isWatcherIntakeMode(value)) {
+      return `invalid value "${value}" for watcher.intake_mode — must be "confirm" or "auto"`;
     }
   } else if (key === 'watcher.initial_state') {
-    const validInitialStates = ['triaged', 'planned', 'approved', 'implementing', 'reviewing', 'verifying', 'pr-ready', 'merged'];
-    if (!validInitialStates.includes(value)) {
-      return `invalid value "${value}" for watcher.initial_state - must be a non-terminal workflow state`;
+    if (!isNonTerminalWorkflowState(value)) {
+      return `invalid value "${value}" for watcher.initial_state — must be a non-terminal workflow state`;
     }
   } else if (key === 'watcher.trigger_label') {
     if (!value.trim()) {

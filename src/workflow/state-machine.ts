@@ -39,6 +39,10 @@ export class InvalidTransitionError extends Error {
   }
 }
 
+export function isNonTerminalWorkflowState(value: string): value is Exclude<WorkflowState, 'closed'> {
+  return (WORKFLOW_STATES as readonly string[]).includes(value) && value !== 'closed';
+}
+
 export function canTransition(from: WorkflowState, to: WorkflowState): boolean {
   if (from === to) {
     return true;

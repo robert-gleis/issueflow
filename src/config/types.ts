@@ -1,7 +1,16 @@
 import type { WorkflowState } from '../workflow/state-machine.js';
 
-export type WatcherSource = 'assigned-to-me' | 'label';
-export type WatcherIntakeMode = 'confirm' | 'auto';
+export const WATCHER_SOURCES = ['assigned-to-me', 'label'] as const;
+export type WatcherSource = (typeof WATCHER_SOURCES)[number];
+export function isWatcherSource(value: string): value is WatcherSource {
+  return (WATCHER_SOURCES as readonly string[]).includes(value);
+}
+
+export const WATCHER_INTAKE_MODES = ['confirm', 'auto'] as const;
+export type WatcherIntakeMode = (typeof WATCHER_INTAKE_MODES)[number];
+export function isWatcherIntakeMode(value: string): value is WatcherIntakeMode {
+  return (WATCHER_INTAKE_MODES as readonly string[]).includes(value);
+}
 
 export interface WatcherConfig {
   interval_seconds: number;
