@@ -8,10 +8,9 @@ import { openStateDb, type StateDb } from '../../src/state/db.js';
 import {
   enqueueIssue,
   getCursor,
-  getIntakeDecision,
+  isIssueIgnored,
   listPending,
-  markIntakeAccepted,
-  markIntakeIgnored,
+  markIssueIgnored,
   markDone,
   markFailed,
   markProcessing,
@@ -88,24 +87,35 @@ describe('watcher-store', () => {
   });
 });
 
-describe('watcher intake decisions', () => {
-  it('returns null when no intake decision exists', () => {
-    expect(getIntakeDecision(db, repo, 42)).toBeNull();
+describe('watcher ignored ledger', () => {
+  it('reports false when an issue has not been ignored', () => {
+    expect(isIssueIgnored(db, repo, 42)).toBe(false);
   });
 
-  it('records accepted decisions', () => {
-    markIntakeAccepted(db, repo, 42, '2026-06-01T12:00:00.000Z');
-    expect(getIntakeDecision(db, repo, 42)).toMatchObject({
-      decision: 'accepted',
-      issue_updated_at: '2026-06-01T12:00:00.000Z'
-    });
+  it('records an ignored issue', () => {
+    markIssueIgnored(db, repo, 43);
+    expect(isIssueIgnored(db, repo, 43)).toBe(true);
   });
 
-  it('records ignored decisions', () => {
-    markIntakeIgnored(db, repo, 43, '2026-06-01T13:00:00.000Z');
-    expect(getIntakeDecision(db, repo, 43)).toMatchObject({
-      decision: 'ignored',
-      issue_updated_at: '2026-06-01T13:00:00.000Z'
-    });
+  it('is idempotent and scoped per issue', () => {
+    markIssueIgnored(db, repo, 43);
+    markIssueIgnored(db, repo, 43);
+    expect(isIssueIgnored(db, repo, 43)).toBe(true);
+    expect(isIssueIgnored(db, repo, 44)).toBe(false);
+  });
+
+  it('scopes ignored issues per repo', () => {
+    markIssueIgnored(db, repo, 43);
+    expect(isIssueIgnored(db, { owner: 'other', repo: 'project' }, 43)).toBe(false);
+  });
+
+  it('persists a decided_at audit timestamp', () => {
+    markIssueIgnored(db, repo, 43);
+    const row = db
+      .prepare(
+        'SELECT decided_at FROM watcher_ignored WHERE repo_owner = ? AND repo_name = ? AND issue_number = ?'
+      )
+      .get(repo.owner, repo.repo, 43) as { decided_at: string };
+    expect(row.decided_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 });

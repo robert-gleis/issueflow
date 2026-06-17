@@ -7,9 +7,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { openStateDb, type StateDb } from '../../src/state/db.js';
 import {
   getCursor,
+  isIssueIgnored,
   listPending,
-  markIntakeAccepted,
-  markIntakeIgnored
+  markIssueIgnored
 } from '../../src/state/watcher-store.js';
 import { runWatchCycle, runWatchLoop } from '../../src/watcher/runner.js';
 import type { TickResult } from '../../src/workflow/engine.js';
@@ -240,6 +240,7 @@ describe('runWatchCycle', () => {
 
     expect(result.enqueued).toBe(0);
     expect(result.processed).toBe(0);
+    expect(isIssueIgnored(db, repo, assignedIssue.number)).toBe(true);
   });
 
   it('auto intake accepts without prompting', async () => {
@@ -272,32 +273,77 @@ describe('runWatchCycle', () => {
     expect(initialized).toEqual([42]);
   });
 
-  it('fails clearly when accepted intake has no local state', async () => {
-    markIntakeAccepted(db, repo, assignedIssue.number, assignedIssue.updatedAt);
+  it('enqueues an issue with existing local state without prompting or re-initializing', async () => {
+    const ticks: number[] = [];
 
-    await expect(
-      runWatchCycle({
-        db,
-        repo,
-        source: 'assigned-to-me',
-        intakeMode: 'auto',
-        initialState: 'triaged',
-        triggerLabel: 'triaged',
-        poll: async () => ({ issues: [assignedIssue], rateLimited: false }),
-        readState: async () => null,
-        initializeState: async () => {
-          throw new Error('should not initialize');
-        },
-        tick: async () => {
-          throw new Error('should not tick');
-        },
-        now: () => new Date('2026-06-02T12:00:00Z')
-      })
-    ).rejects.toThrow(/accepted by watcher intake but has no local workflow state/);
+    const result = await runWatchCycle({
+      db,
+      repo,
+      source: 'assigned-to-me',
+      intakeMode: 'confirm',
+      initialState: 'triaged',
+      triggerLabel: 'triaged',
+      poll: async () => ({ issues: [assignedIssue], rateLimited: false }),
+      confirmIntake: async () => {
+        throw new Error('should not prompt');
+      },
+      readState: async () => 'triaged',
+      initializeState: async () => {
+        throw new Error('should not initialize');
+      },
+      tick: async ({ issueNumber }) => {
+        ticks.push(issueNumber);
+        return {
+          issueNumber,
+          fromState: 'triaged',
+          toState: 'triaged',
+          action: { kind: 'wait', reason: 'agent owns work' }
+        };
+      },
+      now: () => new Date('2026-06-02T12:00:00Z')
+    });
+
+    expect(result.enqueued).toBe(1);
+    expect(result.processed).toBe(1);
+    expect(ticks).toEqual([42]);
+  });
+
+  it('re-prompts an issue whose local state was deleted', async () => {
+    const prompts: string[] = [];
+    const initialized: number[] = [];
+
+    const result = await runWatchCycle({
+      db,
+      repo,
+      source: 'assigned-to-me',
+      intakeMode: 'confirm',
+      initialState: 'triaged',
+      triggerLabel: 'triaged',
+      poll: async () => ({ issues: [assignedIssue], rateLimited: false }),
+      confirmIntake: async (issue) => {
+        prompts.push(issue.title);
+        return true;
+      },
+      readState: async () => null,
+      initializeState: async ({ issueNumber }) => {
+        initialized.push(issueNumber);
+      },
+      tick: async ({ issueNumber }) => ({
+        issueNumber,
+        fromState: 'triaged',
+        toState: 'triaged',
+        action: { kind: 'wait', reason: 'agent owns work' }
+      }),
+      now: () => new Date('2026-06-02T12:00:00Z')
+    });
+
+    expect(prompts).toEqual(['Docker Runner']);
+    expect(initialized).toEqual([42]);
+    expect(result.enqueued).toBe(1);
   });
 
   it('skips previously ignored intake decisions without prompting', async () => {
-    markIntakeIgnored(db, repo, assignedIssue.number, assignedIssue.updatedAt);
+    markIssueIgnored(db, repo, assignedIssue.number);
 
     const result = await runWatchCycle({
       db,

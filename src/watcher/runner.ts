@@ -2,10 +2,9 @@ import type { StateDb } from '../state/db.js';
 import {
   enqueueIssue,
   getCursor,
-  getIntakeDecision,
+  isIssueIgnored,
   listPending,
-  markIntakeAccepted,
-  markIntakeIgnored,
+  markIssueIgnored,
   markDone,
   markFailed,
   markProcessing,
@@ -53,33 +52,26 @@ function maxIso(left: string, right: string): string {
 }
 
 async function shouldEnqueueIssue(deps: WatchCycleDeps, issue: WatchIssue): Promise<boolean> {
-  const decision = getIntakeDecision(deps.db, deps.repo, issue.number);
-  if (decision?.decision === 'ignored') {
+  if (isIssueIgnored(deps.db, deps.repo, issue.number)) {
     return false;
   }
-  if (decision?.decision === 'accepted') {
-    const state = await deps.readState(deps.repo, issue.number);
-    if (state === null) {
-      throw new Error(
-        `Issue #${issue.number} was accepted by watcher intake but has no local workflow state`
-      );
-    }
-    return true;
-  }
 
+  // Local workflow state is the sole record of acceptance: if it exists the issue
+  // was either accepted earlier or is already in progress, so enqueue it.
   const state = await deps.readState(deps.repo, issue.number);
   if (state !== null) {
-    markIntakeAccepted(deps.db, deps.repo, issue.number, issue.updatedAt);
     return true;
   }
 
-  if (deps.intakeMode === 'auto') {
-    await deps.initializeState({
+  const initialize = () =>
+    deps.initializeState({
       repo: deps.repo,
       issueNumber: issue.number,
       initialState: deps.initialState
     });
-    markIntakeAccepted(deps.db, deps.repo, issue.number, issue.updatedAt);
+
+  if (deps.intakeMode === 'auto') {
+    await initialize();
     return true;
   }
 
@@ -87,18 +79,12 @@ async function shouldEnqueueIssue(deps: WatchCycleDeps, issue: WatchIssue): Prom
     throw new Error('watcher intake confirmation requires an interactive prompt');
   }
 
-  const confirmed = await deps.confirmIntake(issue);
-  if (!confirmed) {
-    markIntakeIgnored(deps.db, deps.repo, issue.number, issue.updatedAt);
+  if (!(await deps.confirmIntake(issue))) {
+    markIssueIgnored(deps.db, deps.repo, issue.number);
     return false;
   }
 
-  await deps.initializeState({
-    repo: deps.repo,
-    issueNumber: issue.number,
-    initialState: deps.initialState
-  });
-  markIntakeAccepted(deps.db, deps.repo, issue.number, issue.updatedAt);
+  await initialize();
   return true;
 }
 

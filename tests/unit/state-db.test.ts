@@ -38,14 +38,14 @@ describe('openStateDb', () => {
     db.close();
   });
 
-  it('creates watcher intake table on first open', async () => {
+  it('creates watcher ignored table on first open', async () => {
     const db = await openStateDb(tempDbPath());
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
       .all()
       .map((row) => (row as { name: string }).name);
 
-    expect(tables).toContain('watcher_intake');
+    expect(tables).toContain('watcher_ignored');
     db.close();
   });
 
@@ -90,7 +90,7 @@ describe('openStateDb', () => {
 
     expect(tables).toContain('watcher_cursor');
     expect(tables).toContain('watcher_queue');
-    expect(tables).toContain('watcher_intake');
+    expect(tables).toContain('watcher_ignored');
     expect(version.v).toBe(2);
     db.close();
   });
