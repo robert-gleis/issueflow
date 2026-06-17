@@ -1,18 +1,20 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-const CONFIG_TEMPLATE = `# All fields are optional — defaults are shown below.
+const CONFIG_TEMPLATE = `# All fields are optional - defaults are shown below.
 
 # Where workflow state is persisted.
-#   github-labels (default) — writes a state:* label to the GitHub issue on
-#                             every transition. Requires gh CLI and write access.
-#   local — stores state in ~/.issueflow/state/<owner>/<repo>/<issue-number>
-state_backend: github-labels
+#   local (default) - stores state in ~/.issueflow/state/<owner>/<repo>/<issue-number>
+#   github-labels - writes a state:* label to the GitHub issue on every transition.
+state_backend: local
 
 # Autonomous watcher defaults (used by \`issueflow watch\`).
 watcher:
   interval_seconds: 60
-  trigger_label: "state:triaged"
+  source: assigned-to-me
+  intake_mode: confirm
+  initial_state: triaged
+  trigger_label: "triaged"
 
 # Set to true to allow the engine to auto-approve team plans without
 # a human review gate.

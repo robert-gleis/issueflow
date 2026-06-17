@@ -24,10 +24,13 @@ describe('initConfigFile', () => {
     const filePath = path.join(dir, 'config.yaml');
     await initConfigFile(filePath);
     const content = await fs.readFile(filePath, 'utf8');
-    expect(content).toContain('state_backend: github-labels');
+    expect(content).toContain('state_backend: local');
     expect(content).toContain('autonomous_mode: false');
     expect(content).toContain('interval_seconds: 60');
-    expect(content).toContain('trigger_label:');
+    expect(content).toContain('source: assigned-to-me');
+    expect(content).toContain('intake_mode: confirm');
+    expect(content).toContain('initial_state: triaged');
+    expect(content).toContain('trigger_label: "triaged"');
   });
 
   it('creates parent directories if they do not exist', async () => {
@@ -93,6 +96,17 @@ describe('setConfigKey — nested keys', () => {
     const content = await fs.readFile(filePath, 'utf8');
     expect(content).toContain('interval_seconds: 120');
     expect(content).toContain('trigger_label:');
+  });
+
+  it('replaces watcher source and intake mode within the watcher block', async () => {
+    const dir = await makeTempDir();
+    const filePath = path.join(dir, 'config.yaml');
+    await fs.writeFile(filePath, 'watcher:\n  source: assigned-to-me\n  intake_mode: confirm\n');
+    await setConfigKey(filePath, 'watcher.source', 'label');
+    await setConfigKey(filePath, 'watcher.intake_mode', 'auto');
+    const content = await fs.readFile(filePath, 'utf8');
+    expect(content).toContain('source: label');
+    expect(content).toContain('intake_mode: auto');
   });
 
   it('appends the full watcher block when watcher block is absent', async () => {

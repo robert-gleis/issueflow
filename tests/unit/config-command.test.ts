@@ -26,6 +26,9 @@ function buildHarness(overrides: Partial<ConfigCommandDeps> = {}): Harness {
         state_backend: 'default',
         autonomous_mode: 'default',
         'watcher.interval_seconds': 'default',
+        'watcher.source': 'default',
+        'watcher.intake_mode': 'default',
+        'watcher.initial_state': 'default',
         'watcher.trigger_label': 'default'
       }
     }),
@@ -53,7 +56,7 @@ describe('config get', () => {
   it('prints the resolved value for a valid key', async () => {
     const { program, io } = buildHarness();
     await program.parseAsync(['config', 'get', 'state_backend'], { from: 'user' });
-    expect(io.stdout.join('')).toContain('github-labels');
+    expect(io.stdout.join('')).toContain('local');
   });
 
   it('sets exit code 1 and prints error for unknown key', async () => {
@@ -114,6 +117,23 @@ describe('config set', () => {
     expect(io.exitCode).toBe(1);
     expect(io.stderr.join('')).toMatch(/invalid value/i);
   });
+
+  it('sets watcher source', async () => {
+    const { program, deps } = buildHarness();
+    await program.parseAsync(['config', 'set', 'watcher.source', 'label'], { from: 'user' });
+    expect(deps.setConfigKey).toHaveBeenCalledWith(
+      '/home/user/.issueflow/config.yaml',
+      'watcher.source',
+      'label'
+    );
+  });
+
+  it('rejects invalid watcher source', async () => {
+    const { program, io } = buildHarness();
+    await program.parseAsync(['config', 'set', 'watcher.source', 'mine'], { from: 'user' });
+    expect(io.exitCode).toBe(1);
+    expect(io.stderr.join('')).toMatch(/watcher.source/);
+  });
 });
 
 describe('config show', () => {
@@ -125,6 +145,9 @@ describe('config show', () => {
           state_backend: 'global',
           autonomous_mode: 'default',
           'watcher.interval_seconds': 'repo',
+          'watcher.source': 'default',
+          'watcher.intake_mode': 'default',
+          'watcher.initial_state': 'default',
           'watcher.trigger_label': 'default'
         }
       })
@@ -136,6 +159,15 @@ describe('config show', () => {
     expect(out).toContain('watcher.interval_seconds');
     expect(out).toContain('[repo]');
     expect(out).toContain('[default]');
+  });
+
+  it('prints new watcher keys in config show', async () => {
+    const { program, io } = buildHarness();
+    await program.parseAsync(['config', 'show'], { from: 'user' });
+    const out = io.stdout.join('');
+    expect(out).toContain('watcher.source');
+    expect(out).toContain('watcher.intake_mode');
+    expect(out).toContain('watcher.initial_state');
   });
 });
 

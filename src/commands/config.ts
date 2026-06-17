@@ -45,6 +45,9 @@ const VALID_KEYS = [
   'state_backend',
   'autonomous_mode',
   'watcher.interval_seconds',
+  'watcher.source',
+  'watcher.intake_mode',
+  'watcher.initial_state',
   'watcher.trigger_label'
 ] as const;
 
@@ -68,6 +71,19 @@ function validateValue(key: ConfigKey, value: string): string | null {
     if (!/^\d+$/.test(value.trim()) || !Number.isFinite(n) || n < 5) {
       return `invalid value "${value}" for watcher.interval_seconds — must be an integer >= 5`;
     }
+  } else if (key === 'watcher.source') {
+    if (value !== 'assigned-to-me' && value !== 'label') {
+      return `invalid value "${value}" for watcher.source - must be "assigned-to-me" or "label"`;
+    }
+  } else if (key === 'watcher.intake_mode') {
+    if (value !== 'confirm' && value !== 'auto') {
+      return `invalid value "${value}" for watcher.intake_mode - must be "confirm" or "auto"`;
+    }
+  } else if (key === 'watcher.initial_state') {
+    const validInitialStates = ['triaged', 'planned', 'approved', 'implementing', 'reviewing', 'verifying', 'pr-ready', 'merged'];
+    if (!validInitialStates.includes(value)) {
+      return `invalid value "${value}" for watcher.initial_state - must be a non-terminal workflow state`;
+    }
   } else if (key === 'watcher.trigger_label') {
     if (!value.trim()) {
       return `invalid value for watcher.trigger_label — must be non-empty`;
@@ -80,6 +96,9 @@ function getConfigValue(key: ConfigKey, config: ConfigWithOrigins['config']): st
   if (key === 'state_backend') return config.state_backend;
   if (key === 'autonomous_mode') return String(config.autonomous_mode);
   if (key === 'watcher.interval_seconds') return String(config.watcher.interval_seconds);
+  if (key === 'watcher.source') return config.watcher.source;
+  if (key === 'watcher.intake_mode') return config.watcher.intake_mode;
+  if (key === 'watcher.initial_state') return config.watcher.initial_state;
   return config.watcher.trigger_label;
 }
 
@@ -148,6 +167,9 @@ export function registerConfigCommands(
         ['state_backend', result.config.state_backend, result.origins.state_backend],
         ['autonomous_mode', String(result.config.autonomous_mode), result.origins.autonomous_mode],
         ['watcher.interval_seconds', String(result.config.watcher.interval_seconds), result.origins['watcher.interval_seconds']],
+        ['watcher.source', result.config.watcher.source, result.origins['watcher.source']],
+        ['watcher.intake_mode', result.config.watcher.intake_mode, result.origins['watcher.intake_mode']],
+        ['watcher.initial_state', result.config.watcher.initial_state, result.origins['watcher.initial_state']],
         ['watcher.trigger_label', result.config.watcher.trigger_label, result.origins['watcher.trigger_label']]
       ];
 
