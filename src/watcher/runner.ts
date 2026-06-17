@@ -23,13 +23,17 @@ export interface WatchCycleDeps {
   repo: RepoRef;
   source: WatcherSource;
   intakeMode: WatcherIntakeMode;
-  initialState: WorkflowState;
+  initialState: Exclude<WorkflowState, 'closed'>;
   triggerLabel: string;
   sinceOverride?: string;
   poll: (since: string) => Promise<PollResult>;
   confirmIntake?: (issue: WatchIssue) => Promise<boolean>;
   readState: (repo: RepoRef, issueNumber: number) => Promise<WorkflowState | null>;
-  initializeState: (input: { repo: RepoRef; issueNumber: number; initialState: WorkflowState }) => Promise<void>;
+  initializeState: (input: {
+    repo: RepoRef;
+    issueNumber: number;
+    initialState: Exclude<WorkflowState, 'closed'>;
+  }) => Promise<void>;
   tick: (input: { repo: RepoRef; issueNumber: number }) => Promise<TickResult>;
   now?: () => Date;
 }
@@ -54,6 +58,12 @@ async function shouldEnqueueIssue(deps: WatchCycleDeps, issue: WatchIssue): Prom
     return false;
   }
   if (decision?.decision === 'accepted') {
+    const state = await deps.readState(deps.repo, issue.number);
+    if (state === null) {
+      throw new Error(
+        `Issue #${issue.number} was accepted by watcher intake but has no local workflow state`
+      );
+    }
     return true;
   }
 

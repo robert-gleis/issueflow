@@ -5,7 +5,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { openStateDb, type StateDb } from '../../src/state/db.js';
-import { getCursor, listPending } from '../../src/state/watcher-store.js';
+import { getCursor, listPending, markIntakeAccepted } from '../../src/state/watcher-store.js';
 import { runWatchCycle, runWatchLoop } from '../../src/watcher/runner.js';
 import type { TickResult } from '../../src/workflow/engine.js';
 
@@ -265,6 +265,30 @@ describe('runWatchCycle', () => {
     });
 
     expect(initialized).toEqual([42]);
+  });
+
+  it('fails clearly when accepted intake has no local state', async () => {
+    markIntakeAccepted(db, repo, assignedIssue.number, assignedIssue.updatedAt);
+
+    await expect(
+      runWatchCycle({
+        db,
+        repo,
+        source: 'assigned-to-me',
+        intakeMode: 'auto',
+        initialState: 'triaged',
+        triggerLabel: 'triaged',
+        poll: async () => ({ issues: [assignedIssue], rateLimited: false }),
+        readState: async () => null,
+        initializeState: async () => {
+          throw new Error('should not initialize');
+        },
+        tick: async () => {
+          throw new Error('should not tick');
+        },
+        now: () => new Date('2026-06-02T12:00:00Z')
+      })
+    ).rejects.toThrow(/accepted by watcher intake but has no local workflow state/);
   });
 });
 
