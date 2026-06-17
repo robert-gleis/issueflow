@@ -186,7 +186,7 @@ export function registerWatchCommands(
 ): Command {
   const watch = program
     .command('watch')
-    .description('Poll GitHub for triaged issues and drain them through the workflow engine');
+    .description('Poll GitHub issues and drain accepted issues through the workflow engine');
 
   watch
     .command('run')
