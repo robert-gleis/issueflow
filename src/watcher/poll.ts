@@ -1,12 +1,17 @@
+import type { WatcherSource } from '../config/types.js';
 import type { GhRunner, RepoRef } from '../workflow/state-store.js';
 
-export interface TriagedIssue {
+export interface WatchIssue {
   number: number;
+  title: string;
   updatedAt: string;
+  labels: string[];
+  assignees: string[];
 }
 
 export interface PollInput {
   repo: RepoRef;
+  source: WatcherSource;
   since: string;
   triggerLabel: string;
   gh: GhRunner;
@@ -14,15 +19,17 @@ export interface PollInput {
 }
 
 export interface PollResult {
-  issues: TriagedIssue[];
+  issues: WatchIssue[];
   rateLimited: boolean;
   error?: string;
 }
 
 interface GhIssueJson {
   number: number;
+  title?: string;
   updatedAt: string;
   labels?: Array<{ name?: string }>;
+  assignees?: Array<{ login?: string }>;
 }
 
 export function buildIssueSearchQuery(since: string, triggerLabel: string): string {
@@ -41,23 +48,51 @@ export function isRateLimitError(exitCode: number, stderr: string): boolean {
   );
 }
 
-export async function pollTriagedIssues(input: PollInput): Promise<PollResult> {
-  const args = [
+function buildIssueListArgs(input: PollInput): string[] {
+  const base = [
     'issue',
     'list',
     '--repo',
     `${input.repo.owner}/${input.repo.repo}`,
     '--state',
-    'open',
+    'open'
+  ];
+
+  if (input.source === 'assigned-to-me') {
+    return [
+      ...base,
+      '--assignee',
+      '@me',
+      '--json',
+      'number,title,updatedAt,labels,assignees',
+      '--limit',
+      '100'
+    ];
+  }
+
+  return [
+    ...base,
     '--search',
     buildIssueSearchQuery(input.since, input.triggerLabel),
     '--json',
-    'number,updatedAt,labels',
+    'number,title,updatedAt,labels,assignees',
     '--limit',
     '100'
   ];
+}
 
-  const result = await input.gh(args);
+function toWatchIssue(issue: GhIssueJson): WatchIssue {
+  return {
+    number: issue.number,
+    title: issue.title ?? '',
+    updatedAt: issue.updatedAt,
+    labels: (issue.labels ?? []).flatMap((label) => (label.name ? [label.name] : [])),
+    assignees: (issue.assignees ?? []).flatMap((assignee) => (assignee.login ? [assignee.login] : []))
+  };
+}
+
+export async function pollIssues(input: PollInput): Promise<PollResult> {
+  const result = await input.gh(buildIssueListArgs(input));
   if (result.exitCode !== 0) {
     if (isRateLimitError(result.exitCode, result.stderr)) {
       return { issues: [], rateLimited: true };
@@ -81,8 +116,16 @@ export async function pollTriagedIssues(input: PollInput): Promise<PollResult> {
   }
 
   const issues = raw
-    .filter((issue) => (issue.labels ?? []).some((label) => label.name === input.triggerLabel))
-    .map((issue) => ({ number: issue.number, updatedAt: issue.updatedAt }));
+    .filter(
+      (issue) =>
+        input.source === 'assigned-to-me' ||
+        (issue.labels ?? []).some((label) => label.name === input.triggerLabel)
+    )
+    .map(toWatchIssue);
 
   return { issues, rateLimited: false };
+}
+
+export async function pollTriagedIssues(input: Omit<PollInput, 'source'>): Promise<PollResult> {
+  return pollIssues({ ...input, source: 'label' });
 }

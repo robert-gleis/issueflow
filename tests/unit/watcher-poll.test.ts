@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { buildIssueSearchQuery, isRateLimitError, pollTriagedIssues } from '../../src/watcher/poll.js';
+import { buildIssueSearchQuery, isRateLimitError, pollIssues, pollTriagedIssues } from '../../src/watcher/poll.js';
 import type { GhRunner } from '../../src/workflow/state-store.js';
 
 const repo = { owner: 'acme', repo: 'widgets' };
@@ -36,8 +36,14 @@ describe('pollTriagedIssues', () => {
   it('returns issues with trigger label', async () => {
     const gh = buildRunner(() => ({
       stdout: JSON.stringify([
-        { number: 1, updatedAt: '2026-06-02T10:00:00Z', labels: [{ name: 'state:triaged' }] },
-        { number: 2, updatedAt: '2026-06-02T11:00:00Z', labels: [{ name: 'bug' }] }
+        {
+          number: 1,
+          title: 'Ready issue',
+          updatedAt: '2026-06-02T10:00:00Z',
+          labels: [{ name: 'state:triaged' }],
+          assignees: [{ login: 'robert-gleis' }]
+        },
+        { number: 2, title: 'Bug issue', updatedAt: '2026-06-02T11:00:00Z', labels: [{ name: 'bug' }] }
       ])
     }));
 
@@ -50,7 +56,15 @@ describe('pollTriagedIssues', () => {
 
     expect(result.rateLimited).toBe(false);
     expect(result.error).toBeUndefined();
-    expect(result.issues).toEqual([{ number: 1, updatedAt: '2026-06-02T10:00:00Z' }]);
+    expect(result.issues).toEqual([
+      {
+        number: 1,
+        title: 'Ready issue',
+        updatedAt: '2026-06-02T10:00:00Z',
+        labels: ['state:triaged'],
+        assignees: ['robert-gleis']
+      }
+    ]);
   });
 
   it('sets rateLimited on gh failure', async () => {
@@ -111,5 +125,67 @@ describe('pollTriagedIssues', () => {
     expect(onWarn).toHaveBeenCalledWith(
       expect.stringMatching(/100.*pagination|limit.*100/i)
     );
+  });
+});
+
+describe('pollIssues', () => {
+  it('builds assigned-to-me gh args', async () => {
+    const calls: string[][] = [];
+    const gh: GhRunner = async (args) => {
+      calls.push(args);
+      return {
+        stdout: JSON.stringify([
+          {
+            number: 27,
+            title: 'Docker Runner',
+            updatedAt: '2026-06-08T12:05:18Z',
+            labels: [{ name: 'enhancement' }],
+            assignees: [{ login: 'robert-gleis' }]
+          }
+        ]),
+        stderr: '',
+        exitCode: 0
+      };
+    };
+
+    const result = await pollIssues({
+      repo,
+      source: 'assigned-to-me',
+      since: '2026-06-01T00:00:00Z',
+      triggerLabel: 'triaged',
+      gh
+    });
+
+    expect(calls[0]).toContain('--assignee');
+    expect(calls[0]).toContain('@me');
+    expect(calls[0]).not.toContain('--search');
+    expect(result.issues).toEqual([
+      {
+        number: 27,
+        title: 'Docker Runner',
+        updatedAt: '2026-06-08T12:05:18Z',
+        labels: ['enhancement'],
+        assignees: ['robert-gleis']
+      }
+    ]);
+  });
+
+  it('uses label source query for label polling', async () => {
+    const calls: string[][] = [];
+    const gh: GhRunner = async (args) => {
+      calls.push(args);
+      return { stdout: '[]', stderr: '', exitCode: 0 };
+    };
+
+    await pollIssues({
+      repo,
+      source: 'label',
+      since: '2026-06-01T00:00:00Z',
+      triggerLabel: 'triaged',
+      gh
+    });
+
+    expect(calls[0]).toContain('--search');
+    expect(calls[0]).toContain('updated:>2026-06-01T00:00:00Z label:triaged');
   });
 });
