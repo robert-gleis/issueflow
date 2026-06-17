@@ -31,7 +31,15 @@ export interface ConfigWithOrigins {
 export interface RawConfig {
   state_backend?: StateBackend;
   autonomous_mode?: boolean;
-  watcher?: Partial<WatcherConfig>;
+  watcher?: Partial<RawWatcherConfig>;
+}
+
+interface RawWatcherConfig {
+  interval_seconds: number;
+  source: string;
+  intake_mode: string;
+  initial_state: string;
+  trigger_label: string;
 }
 
 export function defaultConfigPath(): string {
@@ -42,8 +50,8 @@ export function repoConfigPath(repoRoot: string): string {
   return path.join(repoRoot, '.issueflow', 'config.yaml');
 }
 
-function parseWatcherBlock(lines: string[]): Partial<WatcherConfig> {
-  const result: Partial<WatcherConfig> = {};
+function parseWatcherBlock(lines: string[]): Partial<RawWatcherConfig> {
+  const result: Partial<RawWatcherConfig> = {};
   let inWatcher = false;
 
   for (const raw of lines) {
@@ -66,11 +74,11 @@ function parseWatcherBlock(lines: string[]): Partial<WatcherConfig> {
     if (key === 'interval_seconds') {
       result.interval_seconds = Number.parseInt(value, 10);
     } else if (key === 'source') {
-      result.source = value as WatcherSource;
+      result.source = value;
     } else if (key === 'intake_mode') {
-      result.intake_mode = value as WatcherIntakeMode;
+      result.intake_mode = value;
     } else if (key === 'initial_state') {
-      result.initial_state = value as Exclude<WorkflowState, 'closed'>;
+      result.initial_state = value;
     } else if (key === 'trigger_label') {
       result.trigger_label = value;
     }
@@ -110,7 +118,11 @@ export function parseStateBackendFromContent(
   return undefined;
 }
 
-function validateWatcher(configPath: string, watcher: WatcherConfig): void {
+function isNonTerminalWorkflowState(value: string): value is Exclude<WorkflowState, 'closed'> {
+  return WORKFLOW_STATES.includes(value as WorkflowState) && value !== 'closed';
+}
+
+function validateWatcher(configPath: string, watcher: RawWatcherConfig): WatcherConfig {
   if (!Number.isFinite(watcher.interval_seconds) || watcher.interval_seconds < MIN_INTERVAL_SECONDS) {
     throw new Error(`${configPath}: watcher.interval_seconds must be >= ${MIN_INTERVAL_SECONDS}`);
   }
@@ -120,12 +132,19 @@ function validateWatcher(configPath: string, watcher: WatcherConfig): void {
   if (watcher.intake_mode !== 'confirm' && watcher.intake_mode !== 'auto') {
     throw new Error(`${configPath}: watcher.intake_mode must be "confirm" or "auto"`);
   }
-  if (!WORKFLOW_STATES.includes(watcher.initial_state) || watcher.initial_state === 'closed') {
+  if (!isNonTerminalWorkflowState(watcher.initial_state)) {
     throw new Error(`${configPath}: watcher.initial_state must be a non-terminal workflow state`);
   }
   if (!watcher.trigger_label.trim()) {
     throw new Error(`${configPath}: watcher.trigger_label must be non-empty`);
   }
+  return {
+    interval_seconds: watcher.interval_seconds,
+    source: watcher.source,
+    intake_mode: watcher.intake_mode,
+    initial_state: watcher.initial_state,
+    trigger_label: watcher.trigger_label
+  };
 }
 
 function buildWatcher(
@@ -135,7 +154,7 @@ function buildWatcher(
   globalPath: string,
   repoRoot: string | undefined
 ): WatcherConfig {
-  const watcher: WatcherConfig = {
+  const watcher: RawWatcherConfig = {
     ...DEFAULT_CONFIG.watcher,
     ...globalRaw.watcher,
     ...repoRaw.watcher
@@ -143,8 +162,7 @@ function buildWatcher(
   const configPath = repoRaw.watcher !== undefined && repoRoot
     ? repoConfigPath(repoRoot)
     : globalPath;
-  validateWatcher(configPath, watcher);
-  return watcher;
+  return validateWatcher(configPath, watcher);
 }
 
 async function readFileOrNull(filePath: string): Promise<string | null> {
