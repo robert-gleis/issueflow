@@ -10,9 +10,9 @@ IssueFlow drives every issue through a fixed state machine:
 triaged → planned → approved → implementing → reviewing → verifying → pr-ready → merged → closed
 ```
 
-By default, state is stored as a single `state:*` label on the GitHub issue — no external database needed for the workflow itself. From triage to merge, every step is enforced by the Workflow Engine; agents cannot skip or self-certify past gates.
+By default, state is stored locally under `~/.issueflow/state/`, so IssueFlow does not need to write workflow labels back to GitHub. From triage to merge, every step is enforced by the Workflow Engine; agents cannot skip or self-certify past gates.
 
-If you prefer not to write to GitHub issues, set `state_backend: local` in your global config (see [Global configuration](#global-configuration)). State is then stored in files under `~/.issueflow/state/` instead.
+If you prefer GitHub labels as the workflow state store, set `state_backend: github-labels` in your global config (see [Global configuration](#global-configuration)).
 
 ## Prerequisites
 
@@ -211,7 +211,7 @@ issueflow merge show --issue 17
 
 ### `watch` — autonomous issue watcher
 
-Polls GitHub for issues labelled `state:triaged` and drains them through the Workflow Engine automatically.
+By default, `watch` polls open GitHub issues assigned to the authenticated `gh` user. New issues are confirmed once before intake, then IssueFlow stores workflow state locally and drains accepted issues through the Workflow Engine.
 
 ```bash
 # Single poll + drain cycle (good for CI/cron)
@@ -219,7 +219,9 @@ issueflow watch once
 
 # Continuous loop — graceful shutdown on SIGINT/SIGTERM
 ISSUEFLOW_ENGINE=1 issueflow watch run
-ISSUEFLOW_ENGINE=1 issueflow watch run --interval 30 --trigger-label state:triaged
+ISSUEFLOW_ENGINE=1 issueflow watch run --interval 30
+ISSUEFLOW_ENGINE=1 issueflow watch run --intake-mode auto
+ISSUEFLOW_ENGINE=1 issueflow watch run --source label --trigger-label triaged
 ```
 
 Configure defaults in `~/.issueflow/config.yaml` (see [Global configuration](#global-configuration)).
@@ -331,18 +333,21 @@ IssueFlow reads `~/.issueflow/config.yaml` on startup. All fields are optional �
 
 # Where workflow state is persisted.
 #
-#   github-labels (default) — writes a state:* label to the GitHub issue on
-#                             every transition. Requires gh CLI access and
-#                             write permission on the repository.
+#   local (default) — stores state in ~/.issueflow/state/<owner>/<repo>/<issue-number>.
+#                     No GitHub writes are made for state tracking.
 #
-#   local — stores state in ~/.issueflow/state/<owner>/<repo>/<issue-number>
-#           instead. No GitHub writes are made for state tracking.
-state_backend: github-labels
+#   github-labels — writes a state:* label to the GitHub issue on every
+#                   transition. Requires gh CLI access and write permission on
+#                   the repository.
+state_backend: local
 
 # Autonomous watcher defaults (used by `issueflow watch`).
 watcher:
   interval_seconds: 60
-  trigger_label: "state:triaged"
+  source: assigned-to-me
+  intake_mode: confirm
+  initial_state: triaged
+  trigger_label: "triaged"
 
 # Set to true to allow the engine to auto-approve team plans without
 # a human review gate.
