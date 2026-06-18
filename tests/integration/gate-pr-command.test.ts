@@ -47,6 +47,32 @@ function makeFailRun(repoRoot: string, issueNumber: number, runId: string): Veri
   return { ...makePassRun(repoRoot, issueNumber, runId), status: 'fail' };
 }
 
+function makePrDeps(input: {
+  repoRoot: string;
+  repo: RepoRef;
+  issueNumber: number;
+  readGateVerdictRecord?: PrCommandDeps['readGateVerdictRecord'];
+  setExitCode: (code: number) => void;
+}): PrCommandDeps {
+  return {
+    resolveRepoRoot: async () => input.repoRoot,
+    resolveRepoRef: async () => input.repo,
+    resolveIssueNumber: async () => input.issueNumber,
+    readState: async () => 'pr-ready',
+    readVerdict: async () => 'pass',
+    loadLatestRun,
+    readGateVerdictRecord: input.readGateVerdictRecord ?? readGateVerdictRecord,
+    createPullRequest: async () => {
+      throw new Error('createPullRequest should not be called in print-only mode');
+    },
+    readPullRequestRecord: async () => null,
+    runGh: async () => ({ stdout: '', stderr: '', exitCode: 0 }),
+    runGit: async () => ({ stdout: '', stderr: '', exitCode: 0 }),
+    write: () => {},
+    setExitCode: input.setExitCode
+  };
+}
+
 describe('gate evaluate + pr create (integration)', () => {
   it('gate evaluate writes gate-verdict.json and pr create --print-only exits 0', async () => {
     const repoRoot = await makeRepo();
@@ -97,22 +123,16 @@ describe('gate evaluate + pr create (integration)', () => {
 
     let prExitCode = 99;
 
-    const prDeps: PrCommandDeps = {
-      resolveRepoRoot: async () => repoRoot,
-      resolveRepoRef: async () => repo,
-      resolveIssueNumber: async () => issueNumber,
-      readState: async () => 'pr-ready',
-      readVerdict: async () => 'pass',
-      loadLatestRun,
-      readGateVerdictRecord,
-      spawnGhPrCreate: async () => {},
-      write: () => {},
+    const prDeps = makePrDeps({
+      repoRoot,
+      repo,
+      issueNumber,
       setExitCode: (code) => {
         prExitCode = code;
       }
-    };
+    });
 
-    await prCreateAction({ issue: undefined, printOnly: true }, [], prDeps);
+    await prCreateAction({ issue: undefined, printOnly: true }, prDeps);
 
     expect(prExitCode).toBe(0);
   });
@@ -138,22 +158,16 @@ describe('gate evaluate + pr create (integration)', () => {
 
     let prExitCode = 99;
 
-    const prDeps: PrCommandDeps = {
-      resolveRepoRoot: async () => repoRoot,
-      resolveRepoRef: async () => repo,
-      resolveIssueNumber: async () => issueNumber,
-      readState: async () => 'pr-ready',
-      readVerdict: async () => 'pass',
-      loadLatestRun,
-      readGateVerdictRecord,
-      spawnGhPrCreate: async () => {},
-      write: () => {},
+    const prDeps = makePrDeps({
+      repoRoot,
+      repo,
+      issueNumber,
       setExitCode: (code) => {
         prExitCode = code;
       }
-    };
+    });
 
-    await prCreateAction({ issue: undefined, printOnly: true }, [], prDeps);
+    await prCreateAction({ issue: undefined, printOnly: true }, prDeps);
 
     expect(prExitCode).toBe(1);
   });
@@ -168,13 +182,10 @@ describe('gate evaluate + pr create (integration)', () => {
 
     let prExitCode = 99;
 
-    const prDeps: PrCommandDeps = {
-      resolveRepoRoot: async () => repoRoot,
-      resolveRepoRef: async () => repo,
-      resolveIssueNumber: async () => issueNumber,
-      readState: async () => 'pr-ready',
-      readVerdict: async () => 'pass',
-      loadLatestRun,
+    const prDeps = makePrDeps({
+      repoRoot,
+      repo,
+      issueNumber,
       readGateVerdictRecord: async () => ({
         schemaVersion: 1 as const,
         issueNumber,
@@ -184,14 +195,12 @@ describe('gate evaluate + pr create (integration)', () => {
         nextAction: 'pr',
         evaluatedAt: '2026-06-01T09:01:00.000Z'
       }),
-      spawnGhPrCreate: async () => {},
-      write: () => {},
       setExitCode: (code) => {
         prExitCode = code;
       }
-    };
+    });
 
-    await prCreateAction({ issue: undefined, printOnly: true }, [], prDeps);
+    await prCreateAction({ issue: undefined, printOnly: true }, prDeps);
 
     expect(prExitCode).toBe(1);
   });

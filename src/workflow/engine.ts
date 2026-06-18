@@ -1,5 +1,4 @@
 import type { AgentAdapter } from '../agents/index.js';
-import type { AppendEventInput } from '../event-log/types.js';
 import {
   appendKnowledgeToPrompt,
   loadKnowledgeEntries as defaultLoadKnowledgeEntries
@@ -18,6 +17,15 @@ import {
 } from './state-store.js';
 
 export type { EngineAction, PolicyInput, AgentTaskRequest } from './policy.js';
+
+export interface WorkflowAppendEventInput {
+  eventType: 'agent.created';
+  agentId?: string;
+  issueId?: number;
+  workflowId?: string;
+  payload?: Record<string, unknown>;
+  schemaVersion?: number;
+}
 
 export type EngineRefusalCode =
   | 'no-state'
@@ -63,7 +71,7 @@ export interface WorkflowEngineDeps {
   agent?: AgentAdapter;
   loadKnowledgeEntries?: typeof defaultLoadKnowledgeEntries;
   logSpawn?: (line: string) => void;
-  appendEvent?: (input: AppendEventInput) => void;
+  appendEvent?: (input: WorkflowAppendEventInput) => void;
   defaultSpawnHost?: PlannerHost;
   now?: () => Date;
 }

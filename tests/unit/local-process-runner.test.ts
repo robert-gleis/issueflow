@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { PassThrough } from 'node:stream';
 
 import {
   LocalProcessRunner,
@@ -277,16 +278,31 @@ describe('LocalProcessRunner', () => {
     it('sets truncated when combined stdout+stderr exceeds maxLogBytes', async () => {
       const out = 'o'.repeat(40);
       const err = 'e'.repeat(40);
-      const runner = new LocalProcessRunner('local-trunc', { maxLogBytes: 50 });
+      const fakeSpawn: SpawnProcess = () => {
+        const stdout = new PassThrough();
+        const stderr = new PassThrough();
+        const exited = new Promise<{ exitCode: number | null; signal: NodeJS.Signals | null }>((resolve) => {
+          setImmediate(() => {
+            stdout.end(out);
+            stderr.end(err);
+            resolve({ exitCode: 0, signal: null });
+          });
+        });
+
+        return {
+          stdout,
+          stderr,
+          kill: () => {},
+          exited
+        };
+      };
+
+      const runner = new LocalProcessRunner('local-trunc', { maxLogBytes: 50 }, { spawnProcess: fakeSpawn });
       await runner.spawn({
-        binary: process.execPath,
-        args: [
-          '-e',
-          `process.stdout.write(${JSON.stringify(out)}); process.stderr.write(${JSON.stringify(err)})`
-        ],
+        binary: 'fake',
+        args: [],
         cwd: process.cwd()
       });
-      await new Promise((r) => setTimeout(r, 50));
 
       const logs = await runner.logs();
       expect(logs.truncated).toBe(true);
